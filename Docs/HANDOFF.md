@@ -951,7 +951,27 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   it), the point on the face and the yaw facing down it; `WRWorldDressing`'s FArt `Laid` (> 0) sets the panel there
   by its middle and leans it back that share of the way to the slope measured on the ground (WRLand::GroundZAt). The
   cliff pass has its own clearings (16 m from places, 32 m from the Glasswall). Meshes: `make_meshes.py` crag()
-  (SM_Crag_A..D, soft=True SM_CragSoft_A..D).
+  (SM_Crag_A..D, soft=True SM_CragSoft_A..D). Ice walls (glacier, ice, crevasse, lake ice) get the wall pass instead:
+  followed from foot to top, one `ice_face()` sheet (SM_IceFace_A..D) per stretch, set at 62% of the wall's height and
+  stretched to all of it (FArt `bTall`: width and depth only to 1.6 / 1.3), leaning as the wall's steep middle does
+  (`ice_cliff_pitch`, a per-instance array beside the kind: part 3's cave filter keeps it in step); only real walls
+  (middle over 60 degrees, 6 m+, steep either side along it).
+- **The coast** (11-22 round 7): `fire_frost_dressing.mjs`'s coast pass dresses every land's beaches and the meadow lake's
+  banks: `beach_pebbles` / `black_pebbles` / `frost_pebbles` (SM_Pebbles, by the land), `wrack` (SM_Wrack, along the
+  shore's tangent), `driftwood` (SM_Driftwood, collides), `dune_grass` (the MW pack's grass, pale), `shore_ice` (the
+  Tundra). Heights are against the sea's level (-0.2 m) or the lake's; camps, the jetty, the lake's beach and reeds keep
+  clear; heights are from where the sea's edge is drawn (~+0.75 m: its material lifts and waves it), not its level.
+  FArt's `bOrigin` (origin on the ground, Size zero = the mesh's own size), `bFollow` (tipped to the ground's slope),
+  `bShadow` and `Tinted` (M_BuildTinted's ten per-instance floats; shade and grain axis set per instance) carry them.
+- **The moon on the lake**: the lake wears the WaterMaterials ocean (translucent, lit through the volume: no light's
+  highlight ever shows on it). `AWRRoundIsland` lays a second sheet over it in M_WaterGlint (`build_terrain_materials.py`
+  WR_MATERIALS=glint: additive, the view reflected off six wave trains against LightDir), fed by `AWRSky::GetMoonDirection`
+  / `GetMoonGlint` each tick (roundIsland.glintStrength / glintLevel / glintSharp / glintRipple).
+- **The wet band** (`wetShore`: sea, shown, lake, dark): measured up from `shown` (where the sea's edge is drawn). The
+  island's ground takes its brightness from its textures, so the vertex colour hardly darkens it: the wetness also goes to
+  the ground's first UV (`HfWet`), which `M_IslandGround` (`build_forest_ground.py --island`) treats as rain.
+- **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
+  vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'
   rock in courses; wood is WoodMaterialPack2's scans set at run time (`FWRBuildLook::Material`; optional pack, the
   procedural planks without it); M_BuildTinted patterns 0 stone, 1 wood, 2 metal, 3 smooth, 4 plaster, 5 pantiles,

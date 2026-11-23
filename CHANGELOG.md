@@ -2,6 +2,48 @@
 
 ## Unreleased
 
+### Round island: the look pass, sixth round: the beaches, the ice walls, the moon on the lake (11-22)
+
+The round's open list, finished (Raven: "Finish everything that's still open before you ask to push").
+- **Beaches:** they ran bare sand to the water. The whole island's coast is dressed now (`fire_frost_dressing.mjs` coast
+  pass, every land): strips of sea-worn pebbles along the swash where a stretch is stony (`SM_Pebbles`, generated:
+  stones worn round and flat, a strip along the shore; grey on the beaches, black on the Volcanic's, frosted on the
+  Tundra's shingle), the tide's strand line of dark weed with kelp straps lying out of it (`SM_Wrack`), drift logs
+  silvered by the sea lying along the beach (`SM_Driftwood`: grooved along the grain, a root plate or a snapped end;
+  you bump into them), tussocks of pale marram over the back of the sandy beaches, and stranded ice floes on the
+  Tundra's shingle; the meadow lake's banks get pebbles away from its beach, the jetty and the reeds. All of it measured
+  from where the sea's edge is drawn: its material lifts and waves its surface about 0.75 m over its level, and the first
+  try laid the pebbles and the strand line under the water.
+- **The wet band at the water's edge shows:** the shore's wet band (round 2) never showed: measured up from the sea's level
+  it lay under the drawn water, and this ground takes its brightness from its textures, so a darker vertex colour barely
+  darkened the sand (even black darkened it a third). It is measured from the drawn edge now (`wetShore.shown`) and
+  carried to the ground's material on its own (`WRLand` HfWet, the first UV; `M_IslandGround` darkens and shines it
+  as rain does), round the lake too.
+- **Ice walls:** laid by the area of the face, the rounded panels stood in rows up a tall wall, each row's top a ledge:
+  a wall read as stacked slabs, the wall's own dark ground between them. Each ice wall is now followed from its foot to
+  its top and gets one row of fluted ice faces (`SM_IceFace`, generated: ribs from top to bottom, set back where its
+  layers end, the top rounding over with icicles here and there, its sides thinning to nothing), each stretched to the
+  wall's whole height (the Ice Shelves' wall is 60 m) and leaning as the wall's steep middle does, so the Ice Shelves
+  and the glacier fronts read as one fluted ice cliff. Only on ice, only on a real wall (its middle steeper than 60
+  degrees, 6 m or more, running on to either side, ice at its top); steep faces in snow are rock showing through
+  (granite panels), and steep glacier ice is drawn as ice: coloured as ice, not the zone's grey rock (`slopeRock.ice`),
+  and in the ice's own texture streaking down the face with half the rock's relief (`M_IslandGround`: it was the rock
+  texture on every steep face, so a glacier's knob read as grey stone with ice stuck on it).
+- **The moon on the lake:** at night the lake mirrored nothing (its water, the sea's pack material, is lit through the
+  translucency volume: no light's highlight ever shows on it). A second sheet over the lake draws the moon's path of
+  glints (`M_WaterGlint`: the view reflected off rippling water against the moon, the wave trains wandering so they
+  never line up, fading where the water is shallow), shown while the moon is up and the sky clear (`AWRSky`
+  GetMoonDirection / GetMoonGlint).
+- **NaN bounds:** the forest boss, the forest arenas and landmarks, the sky beast and the tree kit built profiles as
+  `Pow(Sin(PI * t), e)`: at t = 1 sin is a hair below 0 and the power NaN, a NaN vertex, NaN bounds (an ensure; the
+  nest's eggs had the same, fixed in 377054d). Clamped.
+- **The GPU crash (still open):** every crash report since phase 2 is the same graphics-card page fault, a bad read in the
+  engine's culling of non-Nanite meshes for the virtual shadow maps (CullPerPageDrawCommandsCs). It hits every map, not
+  only this one, mostly in the first minute. A soak of 20 starts with the batched path off
+  (r.Shadow.Virtual.NonNanite.Batch 0) had no crash, but neither had 11 starts without it, so the soak can't yet tell a
+  fix from luck: nothing is changed. Shadow method Classic (Settings > Video) still avoids it.
+- Round-island tests 0 failed (twice); the city 20.0-21.5 ms a frame, the meadow 8.7-9.2 ms (the higher with another game starting on the card).
+
 ### Round island: the look pass, fifth round: shores, cliffs, windows (11-22)
 
 - **The sea meets the land along the coast, not the ground's grid:** the shore's profile stepped from +0.9 m to -0.5 m

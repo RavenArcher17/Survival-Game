@@ -582,7 +582,7 @@ void UWRForestBossBody::BuildLook()
 		{
 			FWRToolMesh M;
 			TArray<FVector> Prof;
-			for (int32 i = 0; i <= 8; ++i) { const float T = i / 8.f; const float R = H * 0.42f * FMath::Pow(FMath::Sin(T * PI), 0.7f) + 2.f; Prof.Add(FVector(T, R * 1.15f, R)); }
+			for (int32 i = 0; i <= 8; ++i) { const float T = i / 8.f; const float R = H * 0.42f * FMath::Pow(FMath::Max(0.f, FMath::Sin(T * PI)), 0.7f) + 2.f; Prof.Add(FVector(T, R * 1.15f, R)); }
 			M.Lathe(FVector(-H * 0.2f, 0.f, 0.f), FVector::ForwardVector, H * 0.6f, Prof, 12, Orange, 0.3f);
 			for (const float S : { -1.f, 1.f })
 			{
@@ -809,7 +809,7 @@ void UWRForestBossBody::BuildLook()
 		{
 			FWRToolMesh M;
 			TArray<FVector> Prof;
-			for (int32 i = 0; i <= 10; ++i) { const float T = i / 10.f; const float R = Rad * 0.62f * FMath::Pow(FMath::Sin(T * PI), 0.6f) * (1.f + 0.08f * FMath::Sin(T * 13.f)) + 4.f; Prof.Add(FVector(T, R, R * 0.85f)); }
+			for (int32 i = 0; i <= 10; ++i) { const float T = i / 10.f; const float R = Rad * 0.62f * FMath::Pow(FMath::Max(0.f, FMath::Sin(T * PI)), 0.6f) * (1.f + 0.08f * FMath::Sin(T * 13.f)) + 4.f; Prof.Add(FVector(T, R, R * 0.85f)); }
 			M.Lathe(FVector(-Rad * 0.35f, 0.f, 0.f), FVector::ForwardVector, Rad * 1.2f, Prof, 14, FblRgb(70, 56, 42) * 0.5f, 0.9f, Rad * 0.05f, 3.f);
 			AddMesh(HeadB, Head + Fwd * Rad * 0.15f, Yaw, M, FblStatic);
 			if (USceneComponent* Face = AddGroup(HeadB, Head + Fwd * Rad * 0.7f, Yaw, Blocks([&](FblKit& K)
@@ -896,7 +896,7 @@ void UWRForestBossBody::BuildLook()
 			for (int32 p = 0; p < 6; ++p)
 			{
 				TArray<FVector> Prof;
-				for (int32 i = 0; i <= 8; ++i) { const float T = i / 8.f; const float R = Rad * 0.12f * FMath::Pow(FMath::Sin(T * PI), 0.8f) + 2.f; Prof.Add(FVector(T, R, R * 0.9f)); }
+				for (int32 i = 0; i <= 8; ++i) { const float T = i / 8.f; const float R = Rad * 0.12f * FMath::Pow(FMath::Max(0.f, FMath::Sin(T * PI)), 0.8f) + 2.f; Prof.Add(FVector(T, R, R * 0.9f)); }
 				M.Lathe(FVector(-Rad * 0.15f * p, ((p % 2) ? 1.f : -1.f) * Rad * 0.35f, H * 0.04f), FVector::UpVector, Rad * 0.28f, Prof, 9, FblRgb(150, 96, 40) * 0.55f, 0.6f);
 			}
 			AddMesh(Spine2B, Back, Yaw, M, FblPods);

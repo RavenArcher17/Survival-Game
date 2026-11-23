@@ -509,6 +509,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("frost_shrub"), { { Sphere, FLinearColor(0.8f, 0.86f, 0.88f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("kipuka_shrub"), { { Sphere, FLinearColor(0.08f, 0.16f, 0.06f), FVector(120, 120, 70), 15, false, 12000, FVector::ZeroVector } } },
 		{ TEXT("ice_boulder"), { { Cube, FLinearColor(0.55f, 0.7f, 0.85f), FVector(220, 190, 170), 50, true, 24000, FVector(12, 0, 18) } } },
+		// The coast (round 7): drawn only by their art (our own meshes; the marram the MW pack's grass), nothing in their place.
+		{ TEXT("beach_pebbles"), {} }, { TEXT("black_pebbles"), {} }, { TEXT("frost_pebbles"), {} }, { TEXT("wrack"), {} },
+		{ TEXT("driftwood"), {} }, { TEXT("dune_grass"), {} }, { TEXT("shore_ice"), {} },
 	};
 	// Real meshes from the art packs / AI props replace the shapes above where we have them.
 	// Size is what each mesh is fitted to (cm, before the instance's own scale): all three axes for rocks, so they keep
@@ -519,7 +522,12 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	struct FArt { TArray<FString> Meshes; FVector Size; float Sink; bool bCollision; float Cull; FVector Tilt; bool bHeightOnly;
 	              const TCHAR* Material; TArray<FParam> Params; TArray<FScalar> Scalars;
 	              bool bShapeCollision = false;   // keep the shapes' colliding parts, hidden (tree trunks)
-	              float Laid = 0.f; };            // > 0: faces down its slope (its yaw) and leans back that share of the way to the ground's own slope (crags on a cliff)
+	              float Laid = 0.f;               // > 0: faces down its slope (its yaw) and leans back that share of the way to the ground's own slope (crags on a cliff)
+	              bool bOrigin = false;           // its origin on the ground (pebbles half sunk), not its lowest point; Size zero = the mesh's own size
+	              bool bFollow = false;           // tipped to the ground's slope under it (a patch of pebbles 3.4 m across)
+	              bool bShadow = false;           // casts shadows though small and walked through
+	              bool bTall = false;             // its scale stretches it up (a wall's height), its width and depth only so far; its lean from "<kind>_pitch"
+	              TArray<float> Tinted; };        // M_BuildTinted's per-instance data (shade, axis, brightness, colour, metal, rough, glow, pattern): shade and grain axis set per instance
 	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
 	static const TCHAR* IceMat = TEXT("/Game/Terrain/M_IceBlock.M_IceBlock");
 	TArray<FString> Rocks, Shrubs;
@@ -571,7 +579,12 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// in glacier ice crusted with snow ("Snow" 0.7: pale, its
 		// strata faint), so they sit with the ice round them: in rock they read as dark bricks on a pale wall, and in the bare
 		// ice's bold strata as stacked bricks.)
-		{ TEXT("ice_cliff"), { Gen(TEXT("SM_CragSoft"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, { { TEXT("Snow"), 0.7f } }, false, 0.75f } },
+		// (round 7: the rounded-over blocks still read as blocks stuck on the wall, the wall showing between them. Now the
+		// Tundra's ice faces are fluted sheets of glacier ice (SM_IceFace: 12 m across, ribs top to bottom, set back where its
+		// layers end, the top rounding over), one to a stretch of wall, stretched to the wall's whole height (its ribs run
+		// top to bottom; bTall) and leaning as the wall's steep middle does (the dressing's wall pass), their sides and tops
+		// thinning into the slope so they join; the strata show faintly through a crust.)
+		{ TEXT("ice_cliff"), { Gen(TEXT("SM_IceFace"), TEXT("ABCD")), FVector::ZeroVector, 40, true, 45000, FVector(0, 0, 2), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, { { TEXT("Snow"), 0.6f } }, false, 0.9f, false, false, false, true } },
 		// The Tundra's rock faces (granite) and the Volcanic's cones and crater (scoria): the same panels in their rock.
 		{ TEXT("granite_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.5f, 0.5f, 0.53f) } }, { { TEXT("Snow"), 0.45f } }, false, 0.75f } },
 		{ TEXT("scoria_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.3f, 0.17f, 0.13f) } }, { { TEXT("Dust"), 0.3f } }, false, 0.75f } },
@@ -605,6 +618,27 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("swamp_shrub"), { Shrubs, FVector(0, 0, 220), 5, false, 12000, FVector::ZeroVector, true, nullptr,
 			{ { TEXT("Snow Color"), FLinearColor(0.25f, 0.28f, 0.19f) } },
 			{ { TEXT("Amount Min"), WRTune(TEXT("world.swampCoatMin"), 0.3f) }, { TEXT("Amount Max"), WRTune(TEXT("world.swampCoatMax"), 0.9f) } } } },
+		// The coast (round 7, Tools/terrain/fire_frost_dressing.mjs: the beaches ran bare sand to the water): sea-worn pebbles
+		// in the swash (their own sizes, tipped to the beach, a third sunk), in the land's stone; the tide's strand line of
+		// weed, dark and wet; drift logs silvered by the sea (you bump into them); marram over the back of the beach (the MW
+		// grass, pale); on the Tundra's shore stranded ice (the Crevasse Maze's blocks, small).
+		{ TEXT("beach_pebbles"), { Gen(TEXT("SM_Pebbles"), TEXT("ABC")), FVector::ZeroVector, 0, false, 9000, FVector::ZeroVector, false, RockMat,
+			{ { TEXT("Tint"), FLinearColor(0.78f, 0.73f, 0.64f) } }, { { TEXT("Dust"), 0.5f } }, false, 0.f, true, true, true } },
+		{ TEXT("black_pebbles"), { Gen(TEXT("SM_Pebbles"), TEXT("ABC")), FVector::ZeroVector, 0, false, 9000, FVector::ZeroVector, false, RockMat,
+			{ { TEXT("Tint"), FLinearColor(0.16f, 0.15f, 0.145f) } }, { { TEXT("Dust"), 0.f } }, false, 0.f, true, true, true } },
+		{ TEXT("frost_pebbles"), { Gen(TEXT("SM_Pebbles"), TEXT("ABC")), FVector::ZeroVector, 0, false, 9000, FVector::ZeroVector, false, RockMat,
+			{ { TEXT("Tint"), FLinearColor(0.8f, 0.81f, 0.85f) } }, { { TEXT("Snow"), 0.3f } }, false, 0.f, true, true, true } },
+		{ TEXT("wrack"), { Gen(TEXT("SM_Wrack"), TEXT("ABC")), FVector::ZeroVector, 0, false, 8000, FVector::ZeroVector, false, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"),
+			{}, {}, false, 0.f, true, true, true, false, { 0.5f, 0.f, 1.f, 0.03f, 0.028f, 0.012f, 0.f, 0.62f, 0.f, 0.f } } },
+		{ TEXT("driftwood"), { Gen(TEXT("SM_Driftwood"), TEXT("ABC")), FVector::ZeroVector, 4, true, 14000, FVector::ZeroVector, false, TEXT("/Game/Building/M_BuildTinted.M_BuildTinted"),
+			{}, {}, false, 0.f, true, true, true, false, { 0.5f, 0.f, 1.f, 0.34f, 0.31f, 0.27f, 0.f, 0.85f, 0.f, 1.f } } },
+		{ TEXT("dune_grass"), { { TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassA.SM_MWAM_GrassA"), TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassB.SM_MWAM_GrassB"),
+		    TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassC.SM_MWAM_GrassC"), TEXT("/Game/MWLandscapeAutoMaterial/Meshes/Plants/SM_MWAM_GrassD.SM_MWAM_GrassD") },
+			FVector(90, 90, 95), 12, false, 6000, FVector::ZeroVector, false, nullptr,
+			{ { TEXT("MW_BaseColorCorrection"), FLinearColor(0.27f, 0.25f, 0.12f) } }, {} } },
+		// (round 7: the maze's blocks read as ice cubes bobbing out at sea: rounded floes, low, at the water's edge)
+		{ TEXT("shore_ice"), { Rocks, FVector(230, 200, 80), 22, true, 20000, FVector(8, 0, 10), false, IceMat,
+			{ { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, { { TEXT("Snow"), 0.5f } } } },
 	};
 	// Harvestable kinds keep their ground points (bucketed for the swing lookup) and the parts that draw them, on every
 	// machine in the same order, so a ledger key means the same decoration everywhere.
@@ -653,11 +687,15 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			return true;
 		}
 		const int32 Count = Arr.Num() / 5;
+		// Per-instance lean (degrees back from upright) where the writer measured it ("<kind>_pitch": an ice wall's own steep
+		// middle, which a slope measured on the ground round the face's middle misjudged on a 60 m wall).
+		const TArray<TSharedPtr<FJsonValue>>* PitchArr = nullptr;
+		if (!Instances->TryGetArrayField(KindName + TEXT("_pitch"), PitchArr) || PitchArr->Num() != Count) PitchArr = nullptr;
 		for (int32 m = 0; m < Meshes.Num(); ++m)
 		{
 			const FBox Box = Meshes[m]->GetBoundingBox();
 			const FVector Ext = Box.GetSize().ComponentMax(FVector(1.f));
-			const FVector Fit = A.bHeightOnly ? FVector(A.Size.Z / Ext.Z) : A.Size / Ext;
+			const FVector Fit = A.Size.IsNearlyZero() ? FVector(1.f) : A.bHeightOnly ? FVector(A.Size.Z / Ext.Z) : A.Size / Ext;
 			TArray<FTransform> Transforms;
 			for (int32 i = m; i < Count; i += Meshes.Num())  // instances take turns across the meshes
 			{
@@ -665,7 +703,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				const float Yaw = Arr[i * 5 + 3]->AsNumber();
 				const FVector Ground(Arr[i * 5]->AsNumber(), Arr[i * 5 + 1]->AsNumber(), Arr[i * 5 + 2]->AsNumber());
 				FRotator Rot(A.Tilt.X * FMath::Sin(Yaw), Yaw, A.Tilt.Z * FMath::Cos(Yaw * 1.7f));
-				const FVector Scale = Fit * S;
+				const FVector Scale = A.bTall ? Fit * FVector(FMath::Min(S, 1.3f), FMath::Min(S, 1.6f), S) : Fit * S;
 				if (A.Laid > 0.f)
 				{
 					// A crag on a cliff (its point is on the face) faces down it (its yaw, the writer's) and leans back toward the
@@ -673,18 +711,37 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 					// ledge): the slope measured on the ground 4 m either side along its facing. It's set on the face by its
 					// middle, a little over half of it below the point and its back sunk into the slope, so a near-sheer wall is
 					// covered (set by its foot on the ground in front, it sat low and mostly inside the cliff: dark specks).
+					// (over half the panel's own height, at least 4 m: a big ice face measured 4 m either side of its middle near a
+					// wall's top caught the flat above and lay back like an awning)
 					const FVector Dir = FRotator(0.f, Yaw, 0.f).Vector();
-					const float Behind = WRLand::GroundZAt(Ground - Dir * 400.f, Ground.Z), Ahead = WRLand::GroundZAt(Ground + Dir * 400.f, Ground.Z);
-					const float Slope = FMath::RadiansToDegrees(FMath::Atan2(FMath::Max(0.f, Behind - Ahead), 800.f));
-					Rot.Pitch += FMath::Clamp((90.f - Slope) * A.Laid, 0.f, 55.f);
+					const float Reach = FMath::Max(400.f, 0.5f * float(Box.GetSize().Z * Scale.Z));
+					const float Behind = WRLand::GroundZAt(Ground - Dir * Reach, Ground.Z), Ahead = WRLand::GroundZAt(Ground + Dir * Reach, Ground.Z);
+					const float Slope = FMath::RadiansToDegrees(FMath::Atan2(FMath::Max(0.f, Behind - Ahead), 2.f * Reach));
+					Rot.Pitch += PitchArr ? float((*PitchArr)[i]->AsNumber()) : FMath::Clamp((90.f - Slope) * A.Laid, 0.f, 55.f);
 					const FQuat Q = Rot.Quaternion();
 					const float Mid = FMath::Lerp(Box.Min.Z, Box.Max.Z, 0.62f) * Scale.Z;
-					Transforms.Emplace(Rot, Ground - Q.GetUpVector() * Mid - Q.GetForwardVector() * (A.Sink * S), Scale);
+					Transforms.Emplace(Rot, Ground - Q.GetUpVector() * Mid - Q.GetForwardVector() * (A.Sink * float(Scale.X / Fit.X)), Scale);
 					continue;
 				}
-				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, -Box.Min.Z * Scale.Z - A.Sink * S), Scale);
+				const float Lift = A.bOrigin ? 0.f : -Box.Min.Z * Scale.Z;
+				if (A.bFollow)
+				{
+					// Tipped to the ground under it (the ground measured 1.6 m either side, on the land's own surface): a patch of
+					// pebbles 3.4 m across set level on a sloping beach stood out of it on one side and sank on the other.
+					const float R = 160.f;
+					const float Zc = WRLand::GroundZAt(Ground, Ground.Z);
+					const float Dx = WRLand::GroundZAt(Ground + FVector(R, 0.f, 0.f), Zc) - WRLand::GroundZAt(Ground - FVector(R, 0.f, 0.f), Zc);
+					const float Dy = WRLand::GroundZAt(Ground + FVector(0.f, R, 0.f), Zc) - WRLand::GroundZAt(Ground - FVector(0.f, R, 0.f), Zc);
+					const FVector Nrm = FVector(-Dx / (2.f * R), -Dy / (2.f * R), 1.f).GetSafeNormal();
+					const FQuat Q = FQuat::FindBetweenNormals(FVector::UpVector, Nrm) * FRotator(0.f, Yaw, 0.f).Quaternion();
+					Transforms.Emplace(Q, FVector(Ground.X, Ground.Y, Zc) + Nrm * (Lift - A.Sink * S), Scale);
+					continue;
+				}
+				Transforms.Emplace(Rot, Ground + FVector(0.f, 0.f, Lift - A.Sink * S), Scale);
 			}
 			UHierarchicalInstancedStaticMeshComponent* Part = MakeMeshPart(Meshes[m], A.bCollision, A.Cull);
+			if (A.bShadow) Part->SetCastShadow(true);
+			if (A.Tinted.Num() == 10) Part->SetNumCustomDataFloats(10);
 			{
 				// The camera passes through what's smaller than camera.blockMinExtent across (trees, shrubs, small rocks).
 				float Extents[3] = { float(A.Size.X), float(A.Size.Y), float(A.Size.Z) };
@@ -701,6 +758,19 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 				KindMaterials.FindOrAdd(KindName).Add(MID);
 			}
 			Part->AddInstances(Transforms, false, true);
+			if (A.Tinted.Num() == 10)
+			{
+				// each its own shade (hashed from where it lies, the same on every machine), the grain along its length
+				for (int32 t = 0; t < Transforms.Num(); ++t)
+				{
+					float D[10];
+					FMemory::Memcpy(D, A.Tinted.GetData(), sizeof(D));
+					const FVector P = Transforms[t].GetLocation(), X = Transforms[t].GetRotation().GetForwardVector().GetAbs();
+					D[0] = FMath::Frac(FMath::Sin(float(P.X) * 0.0131f + float(P.Y) * 0.0173f) * 43758.5453f);
+					D[1] = X.Z > 0.7f ? 2.f : X.X >= X.Y ? 0.f : 1.f;
+					Part->SetCustomData(t, MakeArrayView(D, 10), t == Transforms.Num() - 1);
+				}
+			}
 			if (HK)
 			{
 				HK->Parts.Add({ Part, Meshes.Num(), m });

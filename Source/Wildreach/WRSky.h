@@ -51,6 +51,10 @@ public:
 	float GetMoonElevation() const { return MoonElevation; }
 	/** Unit vector toward the sun (the sea's highlights follow it). */
 	FVector GetSunDirection() const { return LastSunDir; }
+	/** Unit vector toward the moon, and how much of its light reaches the world (0..1: 0 by day, while it's down, under
+	 *  cloud, in the moonless Graveyard): the lake's glints (WRRoundIsland). */
+	FVector GetMoonDirection() const { return MoonDirNow; }
+	float GetMoonGlint() const { return MoonGlint; }
 	FString Describe() const;
 
 	/** Average frame, game, draw and GPU time over the next Seconds, then log it (FRAMESTATS ...; console wr.FrameStats). */
@@ -112,6 +116,8 @@ private:
 	float FogFalloff = 0.2f;
 	float SunElevation = 0.f;
 	float MoonElevation = 0.f;
+	FVector MoonDirNow = FVector::UpVector;
+	float MoonGlint = 0.f;
 	FVector LastSunDir = FVector::ZeroVector;
 	float LastLoggedHour = -1.f;
 	/** Smoothed biome blend at the camera (0 volcanic .. 1 tundra). */

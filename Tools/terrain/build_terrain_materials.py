@@ -10,6 +10,7 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="Tools/terrai
                 colour R = heat, G = 0 at the sunk rim), drifting downstream (west); its glow is held at a steady
                 on-screen brightness whatever the exposure, and far lava is lifted over the coarser far landscape.
                 Parameters Glow, FarLift (cm per 100 m) are set from tuning (lava.*).
+  M_WaterGlint  the moon's glints on the round island's lake (additive, over its water; WRRoundIsland).
   M_Ice         the ice sheet: deep and clear where it's thick, frosted at the rim, a mirror-smooth top with a cool
                 sheen at grazing angles (vertex colour R = thickness, G = 0 at the sunk rim); FarLift as the lava's.
 """
@@ -673,6 +674,81 @@ if want("obsidian"):
     var = mask(sample("Extra/TEX_MWAM_Variation_msk", mul(side, k=1.0 / 300.0)), "r")
     rough = lerp(None, None, var, const_a=0.06, const_b=0.2)
     finish(base, normal, rough, specular=expr(unreal.MaterialExpressionConstant, r=0.6))
+
+if want("glint"):
+    # 11-22 round 7 (the look pass: at night the lake didn't mirror the moon). The lake's water is the WaterMaterials ocean:
+    # translucent, lit per vertex through the volume, its highlight a painted texture, its reflections a fixed cubemap, so
+    # no light's highlight ever shows on it. This lies on the lake a centimetre over its surface (WRRoundIsland, the
+    # lake's outline), additive and unlit: per pixel the view reflected off a rippled surface (six wave trains, each one
+    # fading out where it gets finer than a pixel so the far water doesn't shimmer, its slope then widening the highlight
+    # instead), against the light's direction: the moon's path of glints on the water and a soft glow round it, the
+    # water's Fresnel (bright low across it, faint looking down). Parameters (WRRoundIsland, from WRSky): LightDir (toward
+    # the light), LightColour, Strength (0 by day / under cloud), Level, Sharp (the highlight's exponent), Ripple (the
+    # waves' slope). Held at a steady on-screen brightness, as the stars are.
+    begin("/Game/Terrain/M_WaterGlint")
+    mat.set_editor_property("blend_mode", unreal.BlendMode.BLEND_ADDITIVE)
+    mat.set_editor_property("shading_model", unreal.MaterialShadingModel.MSM_UNLIT)
+    mat.set_editor_property("two_sided", False)
+    glint = expr(unreal.MaterialExpressionCustom, output_type=unreal.CustomMaterialOutputType.CMOT_FLOAT3, description="Glint", code="""
+float3 Vd = -normalize(CV);
+float2 g = 0;
+float lost = 0;
+// The water's position bent a little (slow, wandering): the wave trains don't line up into a lattice.
+float2 W = P.xy + 70.0 * float2(sin(P.y * 0.0061 + T * 0.05 + sin(P.x * 0.0043)), sin(P.x * 0.0057 - T * 0.04 + sin(P.y * 0.0049)))
+             + 18.0 * float2(sin(P.y * 0.021 + sin(P.x * 0.017 + T * 0.1)), sin(P.x * 0.019 + sin(P.y * 0.023 - T * 0.08)));
+const float2 D[8] = { float2(0.80, 0.60), float2(-0.45, 0.89), float2(0.97, -0.24), float2(-0.88, -0.47), float2(0.20, 0.98), float2(-0.62, 0.78), float2(0.41, -0.91), float2(-0.99, 0.12) };
+const float Lm[8] = { 310.0, 213.0, 141.0, 97.0, 66.0, 43.0, 31.0, 23.0 };
+const float Sp[8] = { 0.9, 1.3, 1.1, 1.7, 2.1, 2.6, 2.9, 3.3 };
+for (int i = 0; i < 8; i++)
+{
+    float k = 6.2832 / Lm[i];
+    float ph = dot(D[i], W) * k + T * Sp[i] * 1.6;
+    float px = length(float2(ddx(ph), ddy(ph)));
+    float keep = saturate(1.5 - px / 1.4);
+    // each train swells and fades in patches across the water
+    float sw = 0.55 + 0.45 * sin(dot(float2(-D[i].y, D[i].x), P.xy) * 0.0045 + i * 1.7 + sin(dot(D[i], P.xy) * 0.0031 + i));
+    g += D[i] * (A * keep * sw * cos(ph));
+    lost += (1.0 - keep) * sw;
+}
+lost *= 0.75;
+float3 N = normalize(float3(-g.x, -g.y, 1.0));
+float3 R = reflect(Vd, N);
+float c = saturate(dot(R, normalize(L)));
+float rough = A * sqrt(lost / 8.0) * 2.0;
+float k2 = K / (1.0 + K * rough * rough);
+float spec = pow(c, k2) * sqrt(k2 / K);
+float haze = pow(c, 36.0) * 0.035;
+float fres = 0.02 + 0.98 * pow(1.0 - saturate(dot(N, -Vd)), 5.0);
+return Col * fres * (spec * 14.0 + haze);
+""")
+    ins = []
+    for name in ("CV", "P", "T", "L", "Col", "A", "K"):
+        ci = unreal.CustomInput()
+        ci.set_editor_property("input_name", name)
+        ins.append(ci)
+    glint.set_editor_property("inputs", ins)
+    link(expr(unreal.MaterialExpressionCameraVectorWS), glint, "CV")
+    link(expr(unreal.MaterialExpressionWorldPosition), glint, "P")
+    link(expr(unreal.MaterialExpressionTime), glint, "T")
+    link(expr(unreal.MaterialExpressionVectorParameter, parameter_name="LightDir", default_value=unreal.LinearColor(0.0, -0.6, 0.2, 1.0)), glint, "L")
+    link(expr(unreal.MaterialExpressionVectorParameter, parameter_name="LightColour", default_value=unreal.LinearColor(0.62, 0.72, 1.0, 1.0)), glint, "Col")
+    link(expr(unreal.MaterialExpressionScalarParameter, parameter_name="Ripple", default_value=0.07), glint, "A")
+    link(expr(unreal.MaterialExpressionScalarParameter, parameter_name="Sharp", default_value=1400.0), glint, "K")
+    strength = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Strength", default_value=0.0)
+    level = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Level", default_value=1.0)
+    steady = expr(unreal.MaterialExpressionEyeAdaptationInverse)
+    ok_l = any(mel.connect_material_expressions(level, "", steady, p) for p in ("LightValue", "Light Value", "LightValueInput"))
+    ok_a = any(mel.connect_material_expressions(expr(unreal.MaterialExpressionConstant, r=0.8), "", steady, p) for p in ("Alpha", "AlphaInput"))
+    if not (ok_l and ok_a):
+        unreal.log_error(f"[Wildreach] glint: EyeAdaptationInverse inputs not connected ({ok_l} {ok_a})")
+    # only over water deep enough to show it: the sheet runs a little past the shore, and over the shallow sand at your
+    # feet (the water's own opacity fades there) the glints lay on the beach (1.2 m of water to come in full)
+    depth = op(unreal.MaterialExpressionSubtract, expr(unreal.MaterialExpressionSceneDepth), expr(unreal.MaterialExpressionPixelDepth))
+    deep = sat(mul(depth, k=1.0 / 120.0))
+    mel.connect_material_property(mul(mul(mul(glint, strength), steady), deep), "", unreal.MaterialProperty.MP_EMISSIVE_COLOR)
+    mel.recompile_material(mat)
+    eal.save_loaded_asset(mat)
+    unreal.log(f"[Wildreach] built {mat.get_name()} ({col[0]} expressions)")
 
 if want("nightsky"):
     # 11-22 (the whole-game look pass: the night had no stars): the stars on a dome round the camera (WRSky BuildStars, a

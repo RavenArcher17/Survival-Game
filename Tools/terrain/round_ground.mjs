@@ -972,7 +972,9 @@ const land = {
 	// soft patches of the zones' second colours (WRLand HfGround; the default 34 m switch read as camouflage from the air)
 	groundPatch: { scale: 80, soft: 0.55, farBlend: 1 },
 	// the wet band along the shores (WRLand HfGround: m over the sea / the lake's level, how dark at the water's edge)
-	wetShore: { sea: 0.7, lake: 0.5, dark: 0.62 },
+	// (shown: the sea draws its edge ~0.75 m over its level, its material's lift and waves: the band runs from there up
+	// the beach past the strand line)
+	wetShore: { sea: 0.9, shown: 0.75, lake: 0.5, dark: 0.55 },
 	zoneBiomes: ZONE_BIOME,
 	groundMaterial: "/Game/Terrain/M_IslandGround.M_IslandGround",
 	// Each zone carries its own biome: zoneBiomes is a JSON object, and the game matches its keys without case ("c" = "C").
@@ -1032,7 +1034,8 @@ const land = {
 		{ id: "snow_crack", class: SURF.snow_crack, color: [168, 184, 202], rough: 0.8, layers: { sand: 0.7, stones: 0.3 } },
 		{ id: "moss_crack", class: SURF.moss_crack, color: [86, 90, 62], rough: 0.9, layers: { moss: 0.5, soil: 0.5 } },
 	],
-	slopeRock: { color: [88, 84, 80], fromDeg: 33, toDeg: 47, ledge: [96, 112, 70] },
+	// (ice: the steep faces of these surfaces, glacier and ice, show ice not the zone's rock: WRLand SlopeIce)
+	slopeRock: { color: [88, 84, 80], fromDeg: 33, toDeg: 47, ledge: [96, 112, 70], ice: [172, 198, 222], iceClasses: [SURF.lake_ice, SURF.glacier, SURF.crevasse, SURF.ice] },
 	// The Volcanic's lava river (WRRoundIsland draws it, molten): its points with the surface level (m), and its width.
 	lava: { width: FF.LAVA_WIDTH, river: lavaLine.filter((p) => Math.hypot(p[0], p[1]) < coastAt(bearingOf(p[0], p[1])) - 10).map((p) => [Math.round(p[0]), Math.round(p[1]), +p[2].toFixed(2)]) },
 	lake: { level: LAKE_LEVEL, at: RI.lakeAt.map(Math.round), outline: lakeOutline.map((p) => p.map(Math.round)),

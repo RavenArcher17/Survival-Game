@@ -839,7 +839,7 @@ void WRForestLook::FBuild::AntlerBarrow()
 				const float Ang = PI * k / 12.f;
 				const float Y = Ww * FMath::Cos(Ang);
 				const float Gz = G(X, Y, FloorZ);
-				Ring.Add(FVector(X, Y, Gz + Hh * FMath::Pow(FMath::Sin(Ang), 0.7f)));
+				Ring.Add(FVector(X, Y, Gz + Hh * FMath::Pow(FMath::Max(0.f, FMath::Sin(Ang)), 0.7f)));
 			}
 			Ring.Add(FVector(X, -Ww, G(X, -Ww, FloorZ) - 120.f));
 			Rings.Add(Ring);

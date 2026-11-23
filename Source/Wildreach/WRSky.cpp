@@ -502,6 +502,7 @@ void AWRSky::Apply(bool bForce)
 	const FVector MoonDir = (-SunDir + FVector(0.f, 0.f, T.Num(TEXT("sky.moonLift"), 0.3f))).GetSafeNormal();
 	SunElevation = FWRSkyRules::Elevation(SunDir);
 	MoonElevation = FWRSkyRules::Elevation(MoonDir);
+	MoonDirNow = MoonDir;
 
 	// Lights turn only once the sun has moved a little (each turn redraws their shadow maps); a clock jump turns them now.
 	const bool bJumped = !LastSunDir.IsZero() && FVector::DotProduct(SunDir, LastSunDir) < FMath::Cos(FMath::DegreesToRadians(3.f));
@@ -538,6 +539,7 @@ void AWRSky::Apply(bool bForce)
 		* (1.f - GraveMoonless) * (1.f + WRGraveSky::BloodMoon * T.Num(TEXT("graveyardWorld.sky.bloodMoonLux"), 0.6f));
 	Moon->SetIntensity(MoonLux);
 	Moon->SetVisibility(MoonLux > 0.f);
+	MoonGlint = FMath::SmoothStep(-2.f, 10.f, MoonElevation) * (1.f - SunUp) * (1.f - GraveMoonless) * (1.f - FMath::Clamp(WeatherAmount, 0.f, 1.f) * 0.9f);
 	Moon->SetLightColor(FMath::Lerp(FLinearColor::White, WRSkyDetail::SRGB(TEXT("graveyardWorld.sky.bloodMoonColor"), FColor(200, 40, 30)), WRGraveSky::BloodMoon));
 	// Night: the sky light (it captures the dark sky) is lifted so shapes still read, and exposure may only brighten
 	// so far. (The fog's colour and density are ApplyAtmosphere's.)

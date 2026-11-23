@@ -42,7 +42,7 @@ namespace WRSkyBeastImpl
 
 	// The ray's outline: its half-width at t (0 the tail root .. 1 the nose), and where its back sweeps.
 	constexpr float RayNose = 230.f, RayRear = -200.f, RaySpan = 450.f;
-	float BeRayHalf(float T) { return RaySpan * FMath::Pow(FMath::Sin(PI * FMath::Pow(T, 1.15f)), 1.2f) + 55.f * FMath::Pow(T, 4.f) + 22.f * FMath::Pow(1.f - T, 6.f); }
+	float BeRayHalf(float T) { return RaySpan * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * FMath::Pow(T, 1.15f))), 1.2f) + 55.f * FMath::Pow(T, 4.f) + 22.f * FMath::Pow(1.f - T, 6.f); }
 	float BeRayThick(float T) { return 72.f * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * FMath::Clamp(T * 0.95f + 0.03f, 0.f, 1.f))), 0.7f); }
 
 	// The whale's girth at t (0 the fluke's root .. 1 the snout).

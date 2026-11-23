@@ -204,9 +204,18 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     rock_y = sample(MW + "Rock_col", mul(append2(wx, wz), k=1.0 / 420.0))
     rock_c = lerp(mask(rock_y, "r", "g", "b"), mask(rock_x, "r", "g", "b"), side)
     rock_n = sample(MW + "Rock_nrm", mul(append2(wx, wz), k=1.0 / 420.0))
-    albedo = lerp(albedo, rock_c, rock_w)
-    normal = lerp(normal, rock_n, rock_w)
-    rough = lerp(rough, const(0.86), rock_w)
+    if strong_tint:
+        # (round 7) steep ice stays ice: where the land's colour is bright (the ice shelves' and the glacier's faces,
+        # WRLand slopeRock.ice) the snow and ice texture streaks down the face with half the rock's relief; drawn as rock,
+        # a glacier's knob read as grey stone with the ice faces stuck on it. Steep snowfields keep their rock showing.
+        ice_keep = sub(const(1.0), mul(snowy, k=0.85))
+        albedo = lerp(albedo, rock_c, mul(rock_w, ice_keep))
+        normal = lerp(normal, rock_n, mul(rock_w, sub(const(1.0), mul(snowy, k=0.5))))
+        rough = lerp(rough, const(0.86), mul(rock_w, ice_keep))
+    else:
+        albedo = lerp(albedo, rock_c, rock_w)
+        normal = lerp(normal, rock_n, rock_w)
+        rough = lerp(rough, const(0.86), rock_w)
 
     # ---- contacts: within 70 cm of any mesh (a boulder, a root, a log, a trunk) the ground goes mossy and damp
     dist = expr(unreal.MaterialExpressionDistanceToNearestSurface)
@@ -280,6 +289,12 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     # ---- rain (the land's Wet): darker and glossier on what faces up
     wet = expr(unreal.MaterialExpressionScalarParameter, parameter_name="Wet", default_value=0.0)
     wet_up = mul(wet, sat(add(mul(nz, k=1.4), k=-0.25)))
+    if strong_tint:
+        # The shore's wet band (round 7): the island's first UV's X is how wet the shore is there (WRLand HfWet: from
+        # where the sea's edge is drawn up the beach, and round the lake); it darkens and shines as rain does. (In the
+        # vertex colour alone it barely showed: this ground takes its brightness from its textures.)
+        shore = sat(mask(expr(unreal.MaterialExpressionTextureCoordinate, coordinate_index=0), "r"))
+        wet_up = op(unreal.MaterialExpressionMax, wet_up, mul(shore, k=0.85))
     albedo = lerp(albedo, mul(albedo, k=0.6), wet_up)
     rough = lerp(rough, const(0.24), mul(wet_up, k=0.85))
 

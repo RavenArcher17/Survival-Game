@@ -113,6 +113,10 @@ private:
 	 *  (tuning sea.dim, their daytime values). */
 	TMap<FName, float> LakeDay;
 	float LastDaylight = -1.f;
+	/** The moon on the lake (M_WaterGlint over its water: the pack's water shows no light's highlight). */
+	UPROPERTY() TObjectPtr<UProceduralMeshComponent> Glint;
+	UPROPERTY() TObjectPtr<UMaterialInstanceDynamic> GlintMat;
+	void StepGlint();
 };
 
 /** Spawns the round island's things on a map that has a land of its own (FWRLandDef::Map), on every machine. */

@@ -32,6 +32,12 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
   SM_QuarryFace_A         Warden's Quarry: an outcrop cut back in three benches scored by drill channels, a 15 m skirt.
   SM_CutBlock_A..B        blocks split from it: chisel grooves, wedge holes along one edge, corners knocked.
   SM_CragSoft_A..D        the same with snow and ice built up over them, every edge rounded (the Tundra's faces).
+  SM_IceFace_A..D         a glacier's face 12 m across, up to 10 m tall: fluted top to bottom, stepped where its layers
+                          end, its top rounding over (some with a cornice), its sides and top sunk back into the slope so
+                          overlapping faces join (the Tundra's steep ice: ice_cliff).
+  The coast (round 7): SM_Pebbles_A..C (a patch of sea-worn pebbles 3.4 m across), SM_Driftwood_A..C (drift logs 4.6,
+                          3.3, 2.5 m: grooved along the grain, root plates or snapped ends, branch stubs), SM_Wrack_A..C
+                          (the tide's strand line of weed 5.4 m long, kelp straps lying out of it).
   SM_Crag_A..D            jointed rock panels for steep faces (10 m across, up to 8.5 m tall, 4.8 m deep), laid against
                           the slope by the dressing (basalt_cliff, ice_cliff, crag_*): the ground's cliffs read as rock.
   SM_GolemRough_A         the quarry's second golem, half carved: a rough block 4.6 m long with a figure lying face up
@@ -1247,6 +1253,175 @@ def crag(name, seed, soft=False):
     save(mesh, name, nanite=True)
 
 
+def pebbles(name, seed, n=170, spread=165.0):
+    """Beach pebbles (round 7, the coast's beach_pebbles): a strip of stones the sea has worn round and flat, about 5.6 m
+    along the shore (X) and 1.8 m across, 6-40 cm, bigger and closer along its middle, thinning out raggedly at its ends
+    and edges (a round patch read as a blot), each lying flat its own way and a third sunk in the sand, their skins a
+    little uneven. Origin at the middle of the strip on the sand; Nanite."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    for k in range(n):
+        r = spread * rnd.random() ** 0.8
+        a = rnd.uniform(0, 2 * math.pi)
+        big = max(0.0, 1.0 - r / (spread * 1.1))
+        rx = rnd.uniform(3.0, 8.0) + 12.0 * big * rnd.random() ** 1.5
+        ry, rz = rx * rnd.uniform(0.6, 1.0), rx * rnd.uniform(0.32, 0.55)
+        yaw, tip = rnd.uniform(0, 2 * math.pi), math.radians(rnd.uniform(-12.0, 12.0))
+        ax = ((math.cos(yaw) * math.cos(tip), math.sin(yaw) * math.cos(tip), math.sin(tip)), (-math.sin(yaw), math.cos(yaw), 0.0),
+              (-math.cos(yaw) * math.sin(tip), -math.sin(yaw) * math.sin(tip), math.cos(tip)))
+        sd = rnd.randint(1, 1 << 20)
+        px, py = math.cos(a) * r * 1.7, math.sin(a) * r * 0.55
+        py += 28.0 * math.sin(px / 140.0 + seed)
+        ellipsoid(raw, (px, py, rz * 0.32), (rx, ry, rz), ax, nu=7, nv=12,
+                  disp=lambda p, sd=sd, rx=rx: rx * 0.09 * fbm(p[0] / 7.0, p[1] / 7.0, p[2] / 7.0, sd, 2))
+    save(raw.mesh(), name, True)
+
+
+def driftwood(name, seed, length, roots=True, stubs=2):
+    """A drift log cast up by the sea (round 7, the coast's driftwood): a trunk worn smooth and split along its grain
+    (shallow grooves), bent a little, thinning to a snapped end; at its foot the root plate, roots splayed and broken
+    short (roots=False: a length of trunk snapped at both ends), a branch stub or two. Lying along X, the foot at -X,
+    its underside a little sunk; origin under its middle on the sand. Nanite."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    r0 = rnd.uniform(15.0, 21.0) * (0.75 + 0.25 * length / 400.0)
+    L = length
+    ctrl = [(-L / 2, 0.0, r0 * 0.72), (-L / 6, rnd.uniform(-22, 22), r0 * 0.72 + rnd.uniform(-3, 5)),
+            (L / 6, rnd.uniform(-30, 30), r0 * 0.6 + rnd.uniform(-3, 5)), (L / 2, rnd.uniform(-45, 45), r0 * 0.4)]
+    path = spline(ctrl, 44)
+    flare = 0.45 if roots else 0.0
+
+    def radius(t):
+        r = r0 * (1.0 - 0.5 * t) * (1.0 + flare * (1.0 - smooth(0.0, 0.12, t)))
+        return (r, r * 0.92)
+
+    def grain(p, t, th, sd=seed):
+        g = math.sin(th * 7.0 + 2.0 * fbm(p[0] / 120.0, t * 3.0, 0.3, sd, 2))
+        return -2.4 * max(0.0, g) ** 6 + 1.2 * fbm(p[0] / 18.0, p[1] / 18.0, p[2] / 18.0, sd + 1, 2)
+    tube(raw, path, radius, na=20, disp=grain, caps=True, jag=(rnd, r0 * 0.9))
+    if roots:
+        # the root plate: a bole wider than the trunk, thick roots out of its rim, short (broken), curling back
+        foot = path[0]
+        ellipsoid(raw, v_add(foot, (-r0 * 0.15, 0.0, 0.0)), (r0 * 0.7, r0 * 1.45, r0 * 1.35), nu=10, nv=16,
+                  disp=lambda p, sd=seed + 50: r0 * 0.12 * fbm(p[0] / 14.0, p[1] / 14.0, p[2] / 14.0, sd, 2))
+        # (round 7: splayed all round, long and thin, they read as a starfish of bones from the beach)
+        n = rnd.randint(4, 6)
+        for k in range(n):
+            ph = 2 * math.pi * (k + rnd.uniform(-0.3, 0.3)) / n
+            d = v_norm((-rnd.uniform(0.45, 0.8), math.cos(ph), math.sin(ph)))
+            start = v_add(foot, v_mul(d, r0 * 0.7))
+            ln = rnd.uniform(22.0, 48.0) * r0 / 18.0
+            bend = (-0.3, rnd.uniform(-0.15, 0.15), -0.18)
+            pts = [v_add(start, v_add(v_mul(d, ln * u), v_mul(bend, ln * u * u))) for u in (0.0, 0.35, 0.7, 1.0)]
+            rr = r0 * rnd.uniform(0.42, 0.62)
+            tube(raw, spline(pts, 9), lambda t, rr=rr: (rr * (1.0 - 0.72 * t) + 1.5, rr * (0.8 - 0.55 * t) + 1.5), na=12,
+                 disp=lambda p, t, th, sd=seed + k: 1.4 * fbm(p[0] / 10.0, p[1] / 10.0, p[2] / 10.0, sd, 2), caps=True, jag=(rnd, rr * 0.5))
+    for k in range(stubs):
+        i = int(rnd.uniform(0.3, 0.8) * (len(path) - 1))
+        base = path[i]
+        ph = rnd.uniform(-1.0, 1.0) * math.pi * 0.45 + (math.pi / 2 if rnd.random() < 0.5 else -math.pi / 2)
+        d = v_norm((0.6, math.cos(ph), abs(math.sin(ph)) * 0.6 + 0.2))
+        rr = radius(i / (len(path) - 1))[0] * 0.35
+        ln = rnd.uniform(25.0, 60.0)
+        tube(raw, [v_add(base, v_mul(d, ln * u)) for u in (0.0, 0.5, 1.0)], lambda t, rr=rr: (rr * (1.0 - 0.4 * t), rr * (1.0 - 0.4 * t)), na=10,
+             caps=True, jag=(rnd, rr * 0.7))
+    save(raw.mesh(), name, True)
+
+
+def wrack(name, seed):
+    """The tide's strand line (round 7, the coast's wrack): dark tangles of weed along a wavy line about 5.4 m long (X),
+    thick here and thinning to nothing there, a few long straps of kelp lying out of it; a few cm high. Origin at its
+    middle on the sand. Nanite."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    L = 540.0
+    for k in range(170):
+        u = rnd.uniform(-L / 2, L / 2)
+        dens = 0.5 + 0.5 * fbm(u / 90.0, 0.31, 0.77, seed, 2)
+        if rnd.random() > 0.15 + 0.85 * dens:
+            continue
+        y = 28.0 * math.sin(u / 120.0 + seed) + 14.0 * fbm(u / 40.0, 1.1, 0.2, seed + 1, 2) + rnd.gauss(0.0, 9.0)
+        sx = rnd.uniform(5.0, 16.0) * (0.6 + 0.6 * dens)
+        yaw = rnd.uniform(0, 2 * math.pi)
+        ax = ((math.cos(yaw), math.sin(yaw), 0.0), (-math.sin(yaw), math.cos(yaw), 0.0), (0.0, 0.0, 1.0))
+        rz = rnd.uniform(1.0, 2.6) * (0.7 + 0.5 * dens)
+        # (crinkled: smooth flattened blobs read as a string of olives up close)
+        ellipsoid(raw, (u, y, rz * 0.25), (sx, sx * rnd.uniform(0.4, 0.8), rz), ax, nu=6, nv=14,
+                  disp=lambda p, sd=seed + k, sx=sx: 0.22 * sx * fbm(p[0] / 2.5, p[1] / 2.5, p[2] / 2.5, sd, 3) + 1.0 * fbm(p[0] / 6.0, p[1] / 6.0, 0.4, sd + 9, 2))
+    for k in range(rnd.randint(9, 14)):
+        u0 = rnd.uniform(-L / 2 + 40, L / 2 - 40)
+        a = rnd.uniform(0, 2 * math.pi)
+        ln = rnd.uniform(60.0, 170.0)
+        pts = []
+        x, y = u0, 28.0 * math.sin(u0 / 120.0 + seed)
+        for m in range(7):
+            pts.append((x, y, 1.1 + 0.4 * math.sin(m * 1.7)))
+            a += rnd.uniform(-0.5, 0.5)
+            x += math.cos(a) * ln / 6.0
+            y += math.sin(a) * ln / 6.0
+        w = rnd.uniform(2.5, 5.0)
+        tube(raw, spline(pts, 18), lambda t, w=w: (w * (1.0 - 0.5 * t) + 0.8, 0.55), na=8,
+             side=lambda p, T: v_cross(T, (0.0, 0.0, 1.0)), caps=True)
+    save(raw.mesh(), name, True)
+
+
+def ice_face(name, seed):
+    """A glacier's or an ice shelf's face (round 7, the Tundra's steep ice: the jointed panels, even rounded over, read as
+    blocks stuck on the wall): one sheet of ice 12 m across and up to 10 m tall, fluted from top to bottom (rounded
+    ribs and runnels that wander a little), set back a step where each of its layers ends, its top rounding over (now
+    and then a cornice of snow leaning out), its foot flared; its sides and top sink back into the slope, so faces laid
+    overlapping join without an edge. Front toward +X, back flat at X -250 (buried), origin at the middle of its foot,
+    as crag()."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    W, NY, NV = 600.0, 97, 73
+    htop = rnd.uniform(800.0, 980.0)
+    cornice = rnd.random() < 0.55
+    waves = [(rnd.uniform(70.0, 240.0), rnd.uniform(0, 2 * math.pi), rnd.uniform(0.5, 1.0)) for _ in range(4)]
+    wsum = sum(w[2] for w in waves)
+    bands = sorted(rnd.uniform(90.0, htop - 140.0) for _ in range(rnd.randint(3, 6)))
+
+    def top(y):
+        return htop * (0.8 + 0.2 * (0.5 + 0.5 * fbm(y / 260.0, 0.5, 0.5, seed, 2))) * (1.0 - 0.22 * (y / W) ** 2)
+
+    def front(y, z, zt):
+        keep = smooth(0.0, 190.0, W - abs(y)) * (1.0 - smooth(zt - 170.0, zt, z)) * smooth(-60.0, 10.0, z)
+        rib = 0.0
+        for lam, ph, amp in waves:
+            sv = math.sin(2 * math.pi * y / lam + ph + 0.7 * fbm(z / 320.0, y / 400.0, 0.1, seed + 3, 2))
+            rib += amp * (1.0 - abs(sv)) ** 1.6
+        x = 150.0 - 45.0 * z / htop + 46.0 * rib / wsum
+        x -= sum(13.0 * smooth(b - 8.0, b + 8.0, z) for b in bands)
+        if cornice:
+            x += 75.0 * math.exp(-((z - (zt - 70.0)) / 55.0) ** 2) * (0.6 + 0.4 * fbm(y / 150.0, 2.2, 0.4, seed + 7, 2))
+        x += 55.0 * (1.0 - smooth(-60.0, 70.0, z))
+        x += 9.0 * fbm(y / 60.0, z / 60.0, 0.3, seed + 5, 3) + 3.0 * fbm(y / 14.0, z / 14.0, 0.8, seed + 6, 2)
+        return keep * x + (1.0 - keep) * -30.0, keep
+
+    F, B = [], []
+    for i in range(NV):
+        rf, rb = [], []
+        v = i / (NV - 1.0)
+        for j in range(NY):
+            y = -W + 2.0 * W * j / (NY - 1.0)
+            zt = top(y)
+            z = -60.0 + v * (zt + 60.0)
+            fx, keep = front(y, z, zt)
+            rf.append(raw.pt((fx, y, z)))
+            # the back follows the front where it thins out (its sides, top and foot): no flat side shows where the
+            # face stands out of the slope (round 7: those flat cuts read as slabs)
+            rb.append(raw.pt((fx - 230.0 * keep - 2.0, y, z)))
+        F.append(rf)
+        B.append(rb)
+    raw.grid(F, lambda c: (1.0, 0.0, 0.0), wrap=False)
+    raw.grid(B, lambda c: (-1.0, 0.0, 0.0), wrap=False)
+    raw.grid([F[-1], B[-1]], lambda c: (0.0, 0.0, 1.0), wrap=False)
+    raw.grid([F[0], B[0]], lambda c: (0.0, 0.0, -1.0), wrap=False)
+    raw.grid([[r[0] for r in F], [r[0] for r in B]], lambda c: (0.0, -1.0, 0.0), wrap=False)
+    raw.grid([[r[-1] for r in F], [r[-1] for r in B]], lambda c: (0.0, 1.0, 0.0), wrap=False)
+    save(raw.mesh(), name, nanite=True)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1302,3 +1477,12 @@ for i, n in enumerate("ABCD"):
     run("crag", crag, "SM_Crag_" + n, 1601 + i)
 for i, n in enumerate("ABCD"):
     run("cragsoft", crag, "SM_CragSoft_" + n, 1611 + i, True)
+for i, n in enumerate("ABCD"):
+    run("iceface", ice_face, "SM_IceFace_" + n, 1621 + i)
+for i, n in enumerate("ABC"):
+    run("pebbles", pebbles, "SM_Pebbles_" + n, 1701 + i)
+run("driftwood", driftwood, "SM_Driftwood_A", 1711, 460.0, True, 2)
+run("driftwood", driftwood, "SM_Driftwood_B", 1712, 330.0, False, 2)
+run("driftwood", driftwood, "SM_Driftwood_C", 1713, 250.0, False, 3)
+for i, n in enumerate("ABC"):
+    run("wrack", wrack, "SM_Wrack_" + n, 1721 + i)

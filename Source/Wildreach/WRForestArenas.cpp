@@ -1328,7 +1328,7 @@ void AWRForestLob::BuildLook()
 	{
 		// A seed pod the size of a cart wheel's hub: orange-brown, ribbed, splitting at its seams.
 		TArray<FVector> Prof;
-		for (int32 i = 0; i <= 10; ++i) { const float T = i / 10.f; const float R = 48.f * FMath::Pow(FMath::Sin(T * PI), 0.8f) + 3.f; Prof.Add(FVector(T, R, R * 0.9f)); }
+		for (int32 i = 0; i <= 10; ++i) { const float T = i / 10.f; const float R = 48.f * FMath::Pow(FMath::Max(0.f, FMath::Sin(T * PI)), 0.8f) + 3.f; Prof.Add(FVector(T, R, R * 0.9f)); }
 		M.Lathe(FVector(0.f, 0.f, -55.f), FVector::UpVector, 110.f, Prof, 10, FaPodC(), 0.6f);
 		M.Tube({ FVector(0.f, 0.f, 50.f), FVector(8.f, 0.f, 75.f), FVector(20.f, 4.f, 85.f) }, 6.f, 6, FaRootC(), 0.9f);
 	}

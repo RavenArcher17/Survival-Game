@@ -8,6 +8,7 @@
 #include "WRWater.h"
 #include "WRGameState.h"
 #include "WRSocial.h"
+#include "WRSky.h"
 #include "Components/HierarchicalInstancedStaticMeshComponent.h"
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
@@ -130,11 +131,29 @@ void AWRRoundIsland::Tick(float DeltaSeconds)
 	const AWRGameState* State = AWRGameState::Get(this);
 	const float Daylight = State ? State->GetDaylight() : 1.f;
 	StepLights(Daylight);
+	StepGlint();
 	if (!LakeMat || LakeDay.Num() == 0) return;
 	if (FMath::Abs(Daylight - LastDaylight) < 0.01f) return;
 	LastDaylight = Daylight;
 	const float Dim = FMath::Lerp(FWRTuning::Get().Num(TEXT("sea.nightDim"), 0.08f), 1.f, Daylight);
 	for (const TPair<FName, float>& P : LakeDay) LakeMat->SetScalarParameterValue(P.Key, P.Value * Dim);
+}
+
+void AWRRoundIsland::StepGlint()
+{
+	if (!Glint || !GlintMat) return;
+	const UWRSkySubsystem* Sub = GetWorld()->GetSubsystem<UWRSkySubsystem>();
+	const AWRSky* Sky = Sub ? Sub->GetSky() : nullptr;
+	const FWRTuning& T = FWRTuning::Get();
+	const float Amount = Sky ? Sky->GetMoonGlint() * T.Num(TEXT("roundIsland.glintStrength"), 1.f) : 0.f;
+	Glint->SetVisibility(Amount > 0.002f);
+	if (Amount <= 0.002f) return;
+	const FVector D = Sky->GetMoonDirection();
+	GlintMat->SetVectorParameterValue(TEXT("LightDir"), FLinearColor(D.X, D.Y, D.Z, 0.f));
+	GlintMat->SetScalarParameterValue(TEXT("Strength"), Amount);
+	GlintMat->SetScalarParameterValue(TEXT("Level"), T.Num(TEXT("roundIsland.glintLevel"), 1.f));
+	GlintMat->SetScalarParameterValue(TEXT("Sharp"), T.Num(TEXT("roundIsland.glintSharp"), 1400.f));
+	GlintMat->SetScalarParameterValue(TEXT("Ripple"), T.Num(TEXT("roundIsland.glintRipple"), 0.07f));
 }
 
 void AWRRoundIsland::BuildCity()
@@ -1221,6 +1240,29 @@ void AWRRoundIsland::BuildWater()
 			for (const TPair<const TCHAR*, float>& P : Calm) LakeMat->SetScalarParameterValue(P.Key, P.Value);
 			if (const TSharedPtr<FJsonObject> Lk = T.Object(TEXT("roundIsland.lakeScalars"))) for (const TPair<FString, TSharedPtr<FJsonValue>>& P : Lk->Values) LakeMat->SetScalarParameterValue(FName(*P.Key), P.Value->AsNumber());
 			Water->SetMaterial(0, LakeMat);
+		}
+		// The moon on the water (round 7: at night the lake mirrored nothing): the pack's water is lit through the
+		// translucency volume, its highlight a painted texture and its reflections a fixed cubemap, so no light ever shows
+		// on it. A second sheet a centimetre over it draws the moon's path of glints (M_WaterGlint: the view reflected off
+		// rippling water against the moon, additive), drawn after the water (its sort priority), shown while the moon is up
+		// and the sky clear (StepGlint).
+		if (UMaterialInterface* GM = LoadObject<UMaterialInterface>(nullptr, *T.Str(TEXT("roundIsland.glintMaterial"), TEXT("/Game/Terrain/M_WaterGlint.M_WaterGlint"))))
+		{
+			Glint = NewObject<UProceduralMeshComponent>(this, TEXT("Glint"));
+			Glint->SetupAttachment(RootComponent);
+			Glint->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Glint->SetCastShadow(false);
+			Glint->SetCanEverAffectNavigation(false);
+			Glint->bVisibleInReflectionCaptures = false;
+			Glint->bVisibleInRealTimeSkyCaptures = false;
+			Glint->TranslucencySortPriority = 1;
+			Glint->RegisterComponent();
+			TArray<FVector> GV;
+			for (const FVector& P : V) GV.Add(P + FVector(0.f, 0.f, T.Num(TEXT("roundIsland.glintLift"), 2.f)));
+			Glint->CreateMeshSection_LinearColor(0, GV, Tri, N, UV, Col, Tan, false);
+			GlintMat = UMaterialInstanceDynamic::Create(GM, this);
+			Glint->SetMaterial(0, GlintMat);
+			Glint->SetVisibility(false);
 		}
 	}
 	// The stream: a ribbon of water down its bed from the lake to the sea (each point's level from the land file).

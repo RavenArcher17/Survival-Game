@@ -186,6 +186,10 @@ struct WILDREACH_API FWRLandDef
 	TArray<FWRLandZone> Zones;
 	FLinearColor SlopeRock = FLinearColor::Gray;
 	float SlopeFrom = 30.f, SlopeTo = 44.f;
+	/** slopeRock.ice / iceClasses: steep ground of these surfaces (glacier, ice) shows this ice instead of the zone's rock
+	 *  (round 7: a glacier's knob in the Snow Flats read as grey rock with ice stuck on it). */
+	FLinearColor SlopeIce = FLinearColor::Transparent;
+	TArray<uint8> SlopeIceClasses;
 	FBox2D MapBox = FBox2D(ForceInit);
 	TSharedPtr<FJsonObject> Json;
 
@@ -218,6 +222,9 @@ struct WILDREACH_API FWRLandDef
 	/** wetShore: the ground darkens within Sea m over the sea and Lake m over the lake's level (near its outline), by
 	 *  Dark at the water's edge: the wet band a shore shows (11-22: grass and sand ran dry into the water). */
 	float WetSea = 0.f, WetLake = 0.f, WetDark = 1.f, LakeLevel = 0.f;
+	/** wetShore.shown: where the sea's edge is drawn (m: its material lifts and waves its surface over its level), the wet
+	 *  band measured up from there (it was from 0, under the drawn water: no band showed). */
+	float WetShown = 0.f;
 	FBox2D LakeBox = FBox2D(ForceInit);
 	TArray<FWRLandSurface> Surfaces;
 	TArray<FWRLandBand> Bands;
@@ -258,6 +265,10 @@ struct WILDREACH_API FWRLandDef
 	TCHAR GridLetter(const FVector2D& M) const;
 	/** Heightfield: the colour (linear) and roughness of sample (I, J), its normal N. */
 	FLinearColor HfGround(int32 I, int32 J, const FVector& N, float& OutRough) const;
+	/** How wet the shore is at a sample (0..1, eased: wetShore), or -1 where the land has no wet band. The island's ground
+	 *  takes it as its first UV's X (M_IslandGround: darker and glossier, as in rain; the vertex colour alone barely
+	 *  darkened the sand there). */
+	float HfWet(int32 I, int32 J) const;
 	/** A layered ground (Aaron 11-16, r-forest-ground; cooks/wild-answers-1115.md 2.5): its own material ("groundMaterial",
 	 *  /Game/Terrain/M_ForestGround) reads each sample's mix of six textured layers from UV1-UV3; the vertex colour stays
 	 *  the sub-zone's tint. Empty: the plain vertex-colour ground. */

@@ -1677,7 +1677,7 @@ namespace WRTreeKitImpl
 							{
 								const float Sm = (float(k) + 0.5f) / float(Seg);
 								const FVector Mid = FMath::Lerp(Rc[k], Rc[k + 1], 0.5f);
-								const float W = F.Width * FMath::Pow(FMath::Sin(PI * FMath::Min(1.f, Sm * 1.1f)), 0.6f) * (1.f - 0.3f * Sm);
+								const float W = F.Width * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * FMath::Min(1.f, Sm * 1.1f))), 0.6f) * (1.f - 0.3f * Sm);
 								// A pinna: forward-swept point; then the notch between pinnae.
 								Pk.Add(G.V(SLeaf, Mid + Sd * (Side * W) + Tg[k] * (W * 0.35f) - FVector(0.f, 0.f, W * 0.15f), Nf, Tg[k], Sm, Side > 0.f ? 1.f : 0.f, FMath::Lerp(Lo, Hi, Sm), 0.72f));
 								const FVector Nx = Rc[k + 1];
@@ -1723,7 +1723,7 @@ namespace WRTreeKitImpl
 			for (int32 k = 0; k <= 8; ++k)
 			{
 				const float S = float(k) / 8.f;
-				const float Z = Hc * FMath::Pow(FMath::Sin(PI * FMath::Min(S * 0.98f, 0.98f)), 0.8f) * (1.f - 0.15f * S) + 3.f;
+				const float Z = Hc * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * FMath::Min(S * 0.98f, 0.98f))), 0.8f) * (1.f - 0.15f * S) + 3.f;
 				Cn.Pts.Add(Dir * (12.f + Reach * S) + Side * (Wv * Reach * S * (1.f - S)) + FVector(0.f, 0.f, Z));
 				Cn.Rad.Add(FMath::Lerp(1.7f, 0.5f, S));
 			}
@@ -2419,7 +2419,7 @@ namespace WRTreeKitImpl
 			for (int32 k = 0; k <= 12; ++k)
 			{
 				const float S2 = float(k) / 12.f;
-				Ar.Pts.Add(FVector(1200.f * S2, Wv * FMath::Sin(2.f * PI * S2), Peak * FMath::Pow(FMath::Sin(PI * S2), 0.9f) - 50.f));
+				Ar.Pts.Add(FVector(1200.f * S2, Wv * FMath::Sin(2.f * PI * S2), Peak * FMath::Pow(FMath::Max(0.f, FMath::Sin(PI * S2)), 0.9f) - 50.f));
 				Ar.Rad.Add(FMath::Lerp(70.f, 45.f, FMath::Sin(PI * S2)));
 			}
 			K.Limbs.Add(Ar);

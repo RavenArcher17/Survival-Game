@@ -4,13 +4,16 @@
 // UWRDressingSubsystem loads on L_Wildreach (the same builder, kinds, harvests and ledger as the Old Island's dressing).
 // Also Data/wildreach_places.json (the places), wildreach_world.json (villages, shrines) and the dressing's pois.
 // Also Data/wildreach_life.json: the creature dens per sub-zone and the roaming minis' loops.
+// And the whole island's coast (every land's beaches, round 7) and the meadow lake's banks: pebbles, wrack, drift logs,
+// marram grass, stranded ice.
 //   node Tools/terrain/fire_frost_dressing.mjs
 import fs from "fs";
 import path from "path";
 import zlib from "zlib";
 import { fileURLToPath } from "url";
-import { fbm } from "./round_island.mjs";
+import { fbm, coastR } from "./round_island.mjs";
 import * as FF from "./fire_frost.mjs";
+import * as HP from "./hearthmoot_plan.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8"));
@@ -132,7 +135,7 @@ for (let gx = -6600; gx < 6600; gx += C) {
 // slope, its point on the face (the game sets it there by its middle and leans it back toward the slope: WRWorldDressing's Laid),
 // in its land's rock: frosted rock on the Tundra's ice and snow, granite on its rock, scoria on the Volcanic's cones and
 // cinder, basalt elsewhere.
-const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55;
+const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 {
 	// Their own clearings: a place stands on level ground, so a cliff panel need only keep 16 m from it (the dressing's
 	// 28 m bared the wall behind the Frozen Whaler), but the Glasswall stands against its ridge (its 52 m of glass runs
@@ -155,13 +158,18 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55;
 	for (const [cx, cy, r] of cliffClear) for (let i = Math.floor((cx - r) / CELL); i <= Math.floor((cx + r) / CELL); i++) for (let j = Math.floor((cy - r) / CELL); j <= Math.floor((cy + r) / CELL); j++) { const k = i + "," + j; if (!cb.has(k)) cb.set(k, []); cb.get(k).push([cx, cy, r]); }
 	const cliffOk = (x, y) => !(cb.get(Math.floor(x / CELL) + "," + Math.floor(y / CELL)) || []).some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) < r + 4);
 	const ICY = new Set(["glacier", "ice", "snow", "snow_forest", "crevasse", "lake_ice", "snow_crack"].map((k) => SURF[k]));
+	// (round 7: ice faces on the ice itself; a steep face in the snow is rock showing through it: granite panels)
+	const ICE = new Set(["glacier", "ice", "crevasse", "lake_ice"].map((k) => SURF[k]));
 	const RED = new Set(["scoria", "cinder", "cinder_grass", "oxide"].map((k) => SURF[k]));
 	let cliffs = 0;
 	for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
 		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
 		const sl0 = slopeAt(gx, gy);
 		if (sl0 < CLIFF_DEG - 3) continue;
-		const want = CLIFF_STEP * CLIFF_STEP / Math.max(0.1, Math.cos(Math.min(84, sl0) * Math.PI / 180)) / CLIFF_AREA;
+		// (the Tundra's ice faces closer: SM_IceFace's sides sink back into the slope, so laid overlapping they join into one
+		// fluted wall, where the rock's panels, further apart, left the ground's own wall showing between them; round 7)
+		const zc0 = zoneAt(gx, gy), icy0 = zc0 && /^T/.test(zc0) && ICE.has(surfAt(gx, gy));
+		const want = CLIFF_STEP * CLIFF_STEP / Math.max(0.1, Math.cos(Math.min(84, sl0) * Math.PI / 180)) / (icy0 ? CLIFF_AREA_ICE : CLIFF_AREA);
 		const tries = Math.floor(want) + (rand(ci, cj, 905) < want - Math.floor(want) ? 1 : 0);
 		for (let t = 0; t < tries; t++) {
 		const x = gx + rand(ci, cj, 901 + t * 11) * CLIFF_STEP, y = gy + rand(ci, cj, 902 + t * 11) * CLIFF_STEP;
@@ -176,12 +184,173 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55;
 		const gxh = hAt(x + 3, y) - hAt(x - 3, y), gyh = hAt(x, y + 3) - hAt(x, y - 3), gl = Math.hypot(gxh, gyh) || 1;
 		const dx = -gxh / gl, dy = -gyh / gl;
 		const z = h;
-		const kind = /^T/.test(zc) ? (ICY.has(sf) ? "ice_cliff" : "granite_cliff") : RED.has(sf) ? "scoria_cliff" : "basalt_cliff";
+		if (/^T/.test(zc) && ICE.has(sf)) continue;   // the ice walls are laid along their foot (below)
+		const kind = /^T/.test(zc) ? "granite_cliff" : RED.has(sf) ? "scoria_cliff" : "basalt_cliff";
 		add(kind, x, y, z, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 903 + t * 11) - 0.5) * 16, 0.85 + 0.45 * rand(ci, cj, 904 + t * 11));
 		cliffs++;
 		}
 	}
 	console.log("cliffs:", cliffs, "panels on ground over", CLIFF_DEG, "degrees");
+	// The Tundra's ice walls (round 7): laid by the area of the face, the panels stood in rows up a tall wall, each row's
+	// top a ledge, so a wall read as a stack of slabs. Here each wall gets one row: from each steep icy point the wall is
+	// followed down to its foot and up to its top (where the ground eases under 26 degrees), and one face (SM_IceFace) is
+	// set at 62% of its height, stretched to the wall's whole height (a face is ~9.5 m tall at scale 1; its width and depth
+	// grow only to 1.6 and 1.3: WRWorldDressing bTall), facing down it and leaning back as the wall's steep middle does
+	// ("ice_cliff_pitch": from where the wall is 15% up to 85%; measured round the face's middle on a 60 m wall it lay
+	// back like an awning); along the wall the next one stands about two-thirds of a face's width on.
+	const anchors = new Map(), AC = 12;
+	const near = (x, y, r) => { for (let i = Math.floor((x - r) / AC); i <= Math.floor((x + r) / AC); i++) for (let j = Math.floor((y - r) / AC); j <= Math.floor((y + r) / AC); j++) for (const [ax, ay] of anchors.get(i + "," + j) || []) if (Math.hypot(x - ax, y - ay) < r) return true; return false; };
+	let walls = 0;
+	for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
+		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
+		const x = gx + rand(ci, cj, 931) * CLIFF_STEP, y = gy + rand(ci, cj, 932) * CLIFF_STEP;
+		const zc = zoneAt(x, y);
+		if (!zc || !/^T/.test(zc) || !PLAN[zc] || !ICE.has(surfAt(x, y)) || slopeAt(x, y) < CLIFF_DEG) continue;
+		const gxh = hAt(x + 3, y) - hAt(x - 3, y), gyh = hAt(x, y + 3) - hAt(x, y - 3), gl = Math.hypot(gxh, gyh) || 1;
+		const dx = -gxh / gl, dy = -gyh / gl;
+		let up = 0, dn = 0;
+		while (up < 70 && slopeAt(x - dx * (up + 1), y - dy * (up + 1)) >= 26) up++;
+		while (dn < 70 && slopeAt(x + dx * (dn + 1), y + dy * (dn + 1)) >= 26) dn++;
+		const bx = x + dx * (dn + 1), by = y + dy * (dn + 1), hB = hAt(bx, by), hT = hAt(x - dx * (up + 1), y - dy * (up + 1)), H = hT - hB;
+		if (H < 3 || hB < 1) continue;
+		const want = hB + 0.62 * H;
+		let ax = x, ay = y;
+		for (let s = 0; s <= up + dn + 2; s += 0.5) { const qx = bx - dx * s, qy = by - dy * s; if (hAt(qx, qy) >= want) { ax = qx; ay = qy; break; } }
+		const S = Math.min(8, Math.max(0.5, H / 9.5));
+		if (near(ax, ay, 8.2 * Math.min(S, 1.6)) || !cliffOk(ax, ay)) continue;
+		// the steep middle's run: where the wall is 15% and 85% of the way up
+		let s15 = 0, s85 = 0;
+		for (let s = 0; s <= up + dn + 2; s += 0.5) { const hh = hAt(bx - dx * s, by - dy * s); if (!s15 && hh >= hB + 0.15 * H) s15 = s; if (hh >= hB + 0.85 * H) { s85 = s; break; } }
+		const lean = Math.max(0, Math.atan2(Math.max(0.5, s85 - s15), 0.7 * H) * 180 / Math.PI);
+		// only a wall (its middle steeper than 60 degrees, 6 m or more): on a steep slope or a dome a flat face lies on
+		// it like a slab; the ground's own ice colour is better there
+		if (lean > 30 || H < 6) continue;
+		// (ice on top too: a glacier front or a shelf; a knob of rock with ice on its flank isn't an ice wall)
+		if (!ICE.has(surfAt(x - dx * (up + 3), y - dy * (up + 3))) || !ICE.has(surfAt(ax, ay))) continue;
+		// and a wall runs on: steep either side along it (a lone face on a knob of ice stood out like a door on a dome)
+		{
+			const w = 8 * Math.min(S, 1.6), tx = -dy, ty = dx;
+			if (slopeAt(ax + tx * w, ay + ty * w) < 45 || slopeAt(ax - tx * w, ay - ty * w) < 45) continue;
+		}
+		const k = Math.floor(ax / AC) + "," + Math.floor(ay / AC);
+		if (!anchors.has(k)) anchors.set(k, []);
+		anchors.get(k).push([ax, ay]);
+		add("ice_cliff", ax, ay, want, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 933) - 0.5) * 8, +S.toFixed(2));
+		(out.ice_cliff_pitch ||= []).push(+lean.toFixed(1));
+		walls++;
+	}
+	console.log("ice walls:", walls, "faces");
+}
+// ---- the coast: what the sea leaves on its beaches (11-22 round 7) ---------------------------------------------------
+// The beaches ran bare sand to the water's edge. Along the whole island's coast (every land; the cliffs' and the islets'
+// rock aside): patches of sea-worn pebbles in the swash where a stretch is stony (on the Tundra's shingle everywhere), the
+// tide's strand line of weed a little above the water, drift logs up the beach lying along it, marram grass over the
+// back of the sandy beaches, and on the Tundra's shore stranded ice; round the meadow's lake, pebbles at the water's edge
+// away from the beach, the jetty and the reeds. Each draws on its own salts of the cell hash, so nothing else moves.
+{
+	// (the sea's material lifts and waves its surface over its level: the water's edge you see lies near +0.75 m (the
+	// pebbles laid to +0.75 stood in the water's edge), so the strand line, the swash and the logs are measured from there)
+	const SEA = -0.2, SHOWN = 0.75, LAKE = LAND.lake.level;
+	const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
+	const RL = read("Tools/terrain/round_island_layout.json");
+	const away = [];
+	for (const l of RL.lands) for (const c of l.camps || []) away.push([c[0], c[1], 60]);
+	away.push([HP.jetty.at[0], HP.jetty.at[1], 24]);
+	for (const p of HP.beach) away.push([p[0], p[1], 14]);
+	for (const [rx, ry] of HP.reeds) away.push([rx, ry, 7]);
+	const coastOk = (x, y) => !away.some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) < r) && isClear(x, y, 2) && lavaDist(x, y) > LAND.lava.width / 2 + 12;
+	const NOT = new Set(["road", "main_road", "plaza", "cobble", "lava", "lava_crust", "shore_rock"].map((k) => SURF[k]).filter((v) => v !== undefined));
+	const SANDY = new Set([SURF.sand, SURF.black_sand, SURF.shingle]);
+	// Which land a shore point is in (out in the swash the zone grid says seabed: look a little inland).
+	const landOf = (x, y) => {
+		const r = Math.hypot(x, y) || 1;
+		for (let d = 0; d <= 90; d += 15) {
+			const z = zoneAt(x * (1 - d / r), y * (1 - d / r));
+			if (z && z !== "seabed" && z !== "deep") return /^V\d/.test(z) ? "volcanic" : /^T\d/.test(z) ? "tundra" : z;
+		}
+		return null;
+	};
+	// marram on the back of the beach, drift logs (more where forests stand behind the shore, most on the Tundra's)
+	const DUNE = { forest: 1, swamp: 0.8, ocean: 1, meadow: 1, storm_peaks: 0.45, graveyard: 0.5, wasteland: 0.3, desert: 0.2 };
+	const DRIFT = { forest: 2, swamp: 1.6, ocean: 1.8, meadow: 1.2, storm_peaks: 1.4, graveyard: 1, wasteland: 0.8, desert: 0.4, volcanic: 0.4, tundra: 2.2 };
+	const WRACK = { volcanic: 0.5, tundra: 0.6 };
+	const tangent = (x, y) => { const gx = hAt(x + 2, y) - hAt(x - 2, y), gy = hAt(x, y + 2) - hAt(x, y - 2), gl = Math.hypot(gx, gy) || 1; return Math.atan2(gx / gl, -gy / gl) * 180 / Math.PI; };
+	const before = { ...counts };
+	const tries = (lam, ci, cj, salt) => Math.floor(lam) + (rand(ci, cj, salt) < lam - Math.floor(lam) ? 1 : 0);
+	const C2 = STEP * STEP;
+	for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
+		const k = j * N + i, h0 = ((BIN[k * 2] | (BIN[k * 2 + 1] << 8)) - HF.offset) / HF.unitsPerMetre;
+		if (h0 < -1.3 || h0 > 3.4) continue;
+		const cx = X0 + i * STEP, cy = Y0 + j * STEP;
+		const lakeSide = Math.abs(h0 - LAKE) < 1.2 && Math.hypot(cx - LAND.lake.at[0], cy - LAND.lake.at[1]) < 420;
+		const r = Math.hypot(cx, cy), deg = (Math.atan2(cx, -cy) * 180 / Math.PI + 360) % 360;
+		if (!lakeSide && Math.abs(r - coastR(deg)) > 260) continue;
+		const pick = (salt) => [cx + (rand(i, j, salt) - 0.5) * STEP, cy + (rand(i, j, salt + 1) - 0.5) * STEP];
+		if (lakeSide) {
+			// the lake's banks: pebbles at the water's edge
+			const lam = C2 / 46 * sm(-0.1, 0.35, fbm(cx / 120, cy / 120, 1731, 2));
+			for (let t = 0, n = tries(lam, i, j, 1730); t < n; t++) {
+				const [x, y] = pick(1732 + t * 5), h = hAt(x, y);
+				if (h < LAKE - 0.45 || h > LAKE + 0.35 || NOT.has(surfAt(x, y)) || !coastOk(x, y)) continue;
+				add("beach_pebbles", x, y, h, rand(i, j, 1734 + t * 5) * 360, 0.7 + 0.5 * rand(i, j, 1735 + t * 5));
+			}
+			continue;
+		}
+		const land = landOf(cx, cy);
+		if (!land || land === "city" || land === "yards") continue;
+		// pebbles in the swash (stony stretches; the Tundra's shingle all along)
+		{
+			const stony = land === "tundra" ? 1 : sm(-0.05, 0.35, fbm(cx / 160, cy / 160, 1701, 2)) + 0.06;
+			for (let t = 0, n = tries(C2 / 34 * stony, i, j, 1700); t < n; t++) {
+				const [x, y] = pick(1702 + t * 5), h = hAt(x, y);
+				if (h < SHOWN - 0.5 || h > (land === "tundra" ? 1.6 : SHOWN + 0.35) || NOT.has(surfAt(x, y)) || !coastOk(x, y)) continue;
+				add(land === "volcanic" ? "black_pebbles" : land === "tundra" ? "frost_pebbles" : "beach_pebbles", x, y, h, tangent(x, y) + (rand(i, j, 1704 + t * 5) - 0.5) * 40, 0.7 + 0.5 * rand(i, j, 1705 + t * 5));
+			}
+		}
+		// the strand line: weed a little above the water, lying along the shore
+		{
+			const lam = 0.26 * sm(-0.3, 0.25, fbm(cx / 200, cy / 200, 1711, 2)) * (WRACK[land] ?? 1);
+			for (let t = 0, n = tries(lam, i, j, 1710); t < n; t++) {
+				const [x, y] = pick(1712 + t * 5), h = hAt(x, y);
+				if (h < SHOWN + 0.05 || h > SHOWN + 0.55 || !SANDY.has(surfAt(x, y)) || !coastOk(x, y)) continue;
+				add("wrack", x, y, h, tangent(x, y) + (rand(i, j, 1714 + t * 5) - 0.5) * 28, 0.8 + 0.45 * rand(i, j, 1715 + t * 5));
+			}
+		}
+		// drift logs up the beach, along it
+		{
+			const lam = 0.0085 * (DRIFT[land] ?? 1);
+			for (let t = 0, n = tries(lam, i, j, 1720); t < n; t++) {
+				const [x, y] = pick(1722 + t * 5), h = hAt(x, y);
+				if (h < SHOWN + 0.35 || h > 2.4 || !SANDY.has(surfAt(x, y)) || !coastOk(x, y)) continue;
+				add("driftwood", x, y, h, tangent(x, y) + (rand(i, j, 1724 + t * 5) - 0.5) * 60 + (rand(i, j, 1726 + t * 5) < 0.5 ? 180 : 0), 0.8 + 0.4 * rand(i, j, 1725 + t * 5));
+			}
+		}
+		// marram over the back of the sandy beaches, in tussocks
+		if (DUNE[land]) {
+			const lam = C2 / 12 * DUNE[land] * sm(-0.1, 0.35, fbm(cx / 45, cy / 45, 1741, 3)) * sm(1.6, 2.5, h0);
+			for (let t = 0, n = Math.min(3, tries(lam, i, j, 1740)); t < n; t++) {
+				const [x, y] = pick(1742 + t * 5), h = hAt(x, y);
+				if (h < 1.6 || surfAt(x, y) !== SURF.sand || !coastOk(x, y)) continue;
+				// a tussock: the tuft and two to four more crowded round it
+				const m = 3 + Math.floor(rand(i, j, 1746 + t * 5) * 3);
+				for (let q = 0; q < m; q++) {
+					const a = rand(i, j, 1760 + t * 17 + q) * 2 * Math.PI, d = q === 0 ? 0 : 0.25 + 0.5 * rand(i, j, 1761 + t * 17 + q);
+					const qx = x + Math.cos(a) * d, qy = y + Math.sin(a) * d;
+					add("dune_grass", qx, qy, hAt(qx, qy), rand(i, j, 1762 + t * 17 + q) * 360, 0.7 + 0.5 * rand(i, j, 1763 + t * 17 + q));
+				}
+			}
+		}
+		// the Tundra's stranded ice: floes and broken blocks in the shallows and on the shingle
+		if (land === "tundra") {
+			const lam = 0.22 * sm(-0.2, 0.3, fbm(cx / 300, cy / 300, 1751, 2));
+			for (let t = 0, n = tries(lam, i, j, 1750); t < n; t++) {
+				const [x, y] = pick(1752 + t * 5), h = hAt(x, y);
+				if (h < SHOWN - 0.35 || h > SHOWN + 0.6 || NOT.has(surfAt(x, y)) || !coastOk(x, y)) continue;
+				add("shore_ice", x, y, h, rand(i, j, 1754 + t * 5) * 360, 0.5 + 0.7 * rand(i, j, 1755 + t * 5) ** 1.5);
+			}
+		}
+	}
+	console.log("coast:", ["beach_pebbles", "black_pebbles", "frost_pebbles", "wrack", "driftwood", "dune_grass", "shore_ice"].map((kk) => kk + " " + ((counts[kk] || 0) - (before[kk] || 0))).join(", "));
 }
 // ---- hazards: the lava burns where its molten channel runs; the lake ice and the glacier's polished ice are slick ----
 const HCELL = 600;
@@ -422,12 +591,15 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	let cut = 0;
 	const inMouth = (x, y) => (LAND.caves || []).some((c) => { const [mx, my] = c.mouth, [dx, dy] = c.dir, s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx; return Math.hypot(x - mx, y - my) < 16 || (s > -14 && s < 14 && Math.abs(lat) < 9) || (c.shapes || []).some((q) => q.k === "shaft" && Math.hypot(x - q.c[0], y - q.c[1]) < q.r + 5); });
 	for (const [kind, arr] of Object.entries(file.instances)) {
-		const keepI = [];
+		if (kind.endsWith("_pitch")) continue;   // (a kind's per-instance leans: kept in step with it below)
+		const pitch = file.instances[kind + "_pitch"], keepI = [], keepP = [];
 		for (let i = 0; i + 4 < arr.length; i += 5) {
 			if (inMouth(arr[i] / 100, arr[i + 1] / 100)) { cut++; continue; }
 			keepI.push(arr[i], arr[i + 1], arr[i + 2], arr[i + 3], arr[i + 4]);
+			if (pitch) keepP.push(pitch[i / 5]);
 		}
 		file.instances[kind] = keepI;
+		if (pitch) file.instances[kind + "_pitch"] = keepP;
 		file.counts[kind] = keepI.length / 5;
 	}
 	console.log("caves cleared of", cut, "dressing pieces");

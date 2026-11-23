@@ -225,6 +225,7 @@ namespace WRLandHfImpl
 			D.WetSea = LNum(*WS, TEXT("sea"), 0.f);
 			D.WetLake = LNum(*WS, TEXT("lake"), 0.f);
 			D.WetDark = LNum(*WS, TEXT("dark"), 0.7f);
+			D.WetShown = LNum(*WS, TEXT("shown"), 0.f);
 			const TSharedPtr<FJsonObject>* Lk = nullptr;
 			const TArray<TSharedPtr<FJsonValue>>* Outline = nullptr;
 			if (D.WetLake > 0.f && J->TryGetObjectField(TEXT("lake"), Lk) && (*Lk)->TryGetArrayField(TEXT("outline"), Outline))
@@ -517,6 +518,12 @@ bool FWRLandDef::Parse(const TSharedPtr<FJsonObject>& J)
 		SlopeRock = WRLand::Colour(*N, TEXT("color"), FColor(104, 100, 95));
 		SlopeFrom = LNum(*N, TEXT("fromDeg"), 30.f);
 		SlopeTo = LNum(*N, TEXT("toDeg"), 44.f);
+		const TArray<TSharedPtr<FJsonValue>>* IceC = nullptr;
+		if ((*N)->HasField(TEXT("ice")) && (*N)->TryGetArrayField(TEXT("iceClasses"), IceC))
+		{
+			SlopeIce = WRLand::Colour(*N, TEXT("ice"), FColor(172, 198, 222));
+			for (const TSharedPtr<FJsonValue>& V : *IceC) SlopeIceClasses.Add(uint8(V->AsNumber()));
+		}
 	}
 	if (J->TryGetArrayField(TEXT("zones"), A))
 	{
@@ -1089,15 +1096,8 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 		}
 	}
 	// The wet band along the sea and the lake.
-	if (WetSea > 0.f || WetLake > 0.f)
+	if (const float Wet = HfWet(I, J); Wet > 0.f)
 	{
-		float Wet = WetSea > 0.f && H > -0.3f ? 1.f - FMath::Clamp(H / WetSea, 0.f, 1.f) : 0.f;
-		if (WetLake > 0.f && LakeBox.bIsValid && LakeBox.IsInside(M))
-		{
-			const float Above = H - LakeLevel;
-			if (Above > -0.3f) Wet = FMath::Max(Wet, 1.f - FMath::Clamp(Above / WetLake, 0.f, 1.f));
-		}
-		Wet *= Wet * (3.f - 2.f * Wet);
 		C = FMath::Lerp(C, C * WetDark, Wet);
 		OutRough = FMath::Lerp(OutRough, 0.35f, Wet);
 	}
@@ -1109,9 +1109,25 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 		const float Ledge = SpineW * (1.f - Rock) * Smooth(8.f, SlopeFrom, Slope) * Smooth(-0.3f, 0.3f, Noise(M / 5.f + FVector2D(6.f, 6.f)));
 		C = FMath::Lerp(C, LedgeColor, Ledge * 0.8f);
 	}
-	C = FMath::Lerp(C, SlopeHere * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
+	const bool bIceFace = SlopeIce.A > 0.f && SlopeIceClasses.Contains(Cls);
+	C = FMath::Lerp(C, (bIceFace ? SlopeIce : SlopeHere) * (0.85f + 0.3f * (Noise(M / 7.f) * 0.5f + 0.5f)), Rock);
 	OutRough = FMath::Lerp(OutRough, 0.86f, Rock);
 	return C;
+}
+
+float FWRLandDef::HfWet(int32 I, int32 J) const
+{
+	if (WetSea <= 0.f && WetLake <= 0.f) return -1.f;
+	const FVector2D M = HfOrigin + FVector2D(float(I), float(J)) * HfStep;
+	const float H = HfSample(I, J);
+	// (up from where the sea's edge is drawn, wetShore.shown: measured from its level the band lay under the water)
+	float Wet = WetSea > 0.f && H > -0.3f ? 1.f - FMath::Clamp((H - WetShown) / WetSea, 0.f, 1.f) : 0.f;
+	if (WetLake > 0.f && LakeBox.bIsValid && LakeBox.IsInside(M))
+	{
+		const float Above = H - LakeLevel;
+		if (Above > -0.3f) Wet = FMath::Max(Wet, 1.f - FMath::Clamp(Above / WetLake, 0.f, 1.f));
+	}
+	return Wet * Wet * (3.f - 2.f * Wet);
 }
 
 void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
@@ -1744,7 +1760,8 @@ bool AWRLand::BuildHeightfieldChunk(const FIntPoint& Cell, bool bAsync)
 			Verts.Add(D.ToWorld(M, Z) - D.Origin);
 			Normals.Add(Nrm);
 			Colours.Add(C);
-			UV.Add(M / 4.f);
+			const float ShoreWet = D.HfWet(SI, SJ);
+			UV.Add(ShoreWet >= 0.f ? FVector2D(ShoreWet, 0.f) : M / 4.f);
 			if (bLayers)
 			{
 				float L[6];
@@ -1988,7 +2005,8 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 		S.Verts.Add(D.ToWorld(M, Z) - D.Origin);
 		S.Normals.Add(Nrm);
 		S.Colours.Add(C);
-		S.UV.Add(M / 4.f);
+		const float ShoreWet = D.HfWet(SI, SJ);
+		S.UV.Add(ShoreWet >= 0.f ? FVector2D(ShoreWet, 0.f) : M / 4.f);
 		if (bLayers)
 		{
 			S.UV1.Add(FVector2D(L[0], L[1]));
