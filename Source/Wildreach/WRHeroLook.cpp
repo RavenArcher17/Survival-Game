@@ -694,9 +694,75 @@ void AWRCharacter::ApplyOutfit(const TSharedPtr<FJsonObject>& Art)
 			}
 		}
 	}
+	ApplyShoes(Outfit.IsValidIndex(3) && Outfit[3]->IsVisible() ? SlotLook[3] : nullptr);
 	RefreshLODSync();
 	// The endgame's look over the fresh outfit: an armour dye, a raid mark (WREndgameLook).
 	ApplyDeedsLook();
+}
+
+void AWRCharacter::ApplyShoes(const TSharedPtr<FJsonObject>& LegsLook)
+{
+	using namespace WRHeroLookImpl;
+	// The legs piece's "shoes" {mesh, material}: one on each foot bone, set by the body's own bind pose (its ankle over
+	// the ground, the toe toward the ball of its foot, sized by that stretch), so one mesh fits every body.
+	const TSharedPtr<FJsonObject> Shoes = Obj(LegsLook, TEXT("shoes"));
+	FString MeshPath, MatPath;
+	if (Shoes.IsValid())
+	{
+		Shoes->TryGetStringField(TEXT("mesh"), MeshPath);
+		Shoes->TryGetStringField(TEXT("material"), MatPath);
+	}
+	UStaticMesh* ShoeMesh = MeshPath.IsEmpty() ? nullptr : LoadObject<UStaticMesh>(nullptr, *MeshPath);
+	USkeletalMesh* BodyAsset = Body ? Body->GetSkeletalMeshAsset() : nullptr;
+	if (!ShoeMesh || !BodyAsset)
+	{
+		if (ShoeL) ShoeL->SetVisibility(false);
+		if (ShoeR) ShoeR->SetVisibility(false);
+		return;
+	}
+	UMaterialInterface* Mat = MatPath.IsEmpty() ? nullptr : LoadObject<UMaterialInterface>(nullptr, *MatPath);
+	const FReferenceSkeleton& Ref = BodyAsset->GetRefSkeleton();
+	const auto RefCS = [&Ref](const TCHAR* Bone, FTransform& Out)
+	{
+		int32 I = Ref.FindBoneIndex(FName(Bone));
+		if (I == INDEX_NONE) return false;
+		Out = FTransform::Identity;
+		while (I != INDEX_NONE)
+		{
+			Out = Out * Ref.GetRefBonePose()[I];
+			I = Ref.GetParentIndex(I);
+		}
+		return true;
+	};
+	const float MeshAnkleToBall = Shoes->HasField(TEXT("ankleToBall")) ? float(Shoes->GetNumberField(TEXT("ankleToBall"))) : 14.f;   // make_meshes.py shoe
+	static const TCHAR* Bones[2][2] = { { TEXT("foot_l"), TEXT("ball_l") }, { TEXT("foot_r"), TEXT("ball_r") } };
+	for (int32 s = 0; s < 2; ++s)
+	{
+		TObjectPtr<UStaticMeshComponent>& Shoe = s == 0 ? ShoeL : ShoeR;
+		FTransform Foot, Ball;
+		FVector Fwd = FVector::ZeroVector;
+		if (RefCS(Bones[s][0], Foot) && RefCS(Bones[s][1], Ball)) Fwd = (Ball.GetLocation() - Foot.GetLocation()) * FVector(1.f, 1.f, 0.f);
+		const float Len = Fwd.Size();
+		if (Len < 2.f)
+		{
+			if (Shoe) Shoe->SetVisibility(false);
+			continue;
+		}
+		if (!Shoe)
+		{
+			Shoe = NewObject<UStaticMeshComponent>(this, s == 0 ? TEXT("ShoeL") : TEXT("ShoeR"));
+			Shoe->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+			Shoe->SetCanEverAffectNavigation(false);
+			Shoe->SetupAttachment(Body, FName(Bones[s][0]));
+			Shoe->RegisterComponent();
+		}
+		Shoe->AttachToComponent(Body, FAttachmentTransformRules::KeepRelativeTransform, FName(Bones[s][0]));
+		Shoe->SetStaticMesh(ShoeMesh);
+		if (Mat) Shoe->SetMaterial(0, Mat);
+		const FTransform OnGround(FRotationMatrix::MakeFromXZ(Fwd / Len, FVector::UpVector).Rotator(), FVector(Foot.GetLocation().X, Foot.GetLocation().Y, 0.f), FVector(Len / MeshAnkleToBall));
+		Shoe->SetRelativeTransform(OnGround.GetRelativeTransform(Foot));
+		Shoe->SetVisibility(true);
+	}
 }
 
 void AWRCharacter::RefreshLODSync()

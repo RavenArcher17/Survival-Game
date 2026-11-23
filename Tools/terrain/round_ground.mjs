@@ -562,10 +562,10 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 			})()
 			: z === "T7" ? (Math.max(0, 1 - Math.abs(fbm(x / 520, y / 300, 1068 + 43, 3)) * 22) > 0.4 ? SURF.shingle
 				: n > -0.25 + 0.9 * (1 - smooth(60, 200, FF.beyondAt("tundra", [x, y]))) ? SURF.steppe : SURF.snow)   // old snow lies in its hollows
-			: (n > -0.15 ? SURF.thaw_moss : SURF.snow);
+			: (n > -0.15 - 0.75 * (1 - smooth(90, 340, Math.hypot(x, y) - meadowAt(bearingOf(x, y)))) ? SURF.thaw_moss : SURF.snow);
 		if (z === "T6" && thawPond(x, y) > 0.5) S[k] = SURF.lake_ice;
 		else if (z === "T6" && thawChan(x, y) > 0.35) S[k] = SURF.shingle;
-		else if ((z === "T1" || z === "T6") && polyEdge(x, y, 26, 401) < 0.6 && fbm(x / 240, y / 240, 1068 + 33, 2) > 0.05) S[k] = S[k] === SURF.thaw_moss ? SURF.moss_crack : SURF.snow_crack;
+		else if ((z === "T1" || z === "T6") && polyEdge(x, y, 26, 401) < 0.6 && fbm(x / 240, y / 240, 1068 + 33, 2) > 0.05 && Math.hypot(x, y) - meadowAt(bearingOf(x, y)) > 140) S[k] = S[k] === SURF.thaw_moss ? SURF.moss_crack : SURF.snow_crack;
 		if (z === "T4" && clearOf(x, y, 0) && (H[k] < sampleH(x + 8, y) - 2 || H[k] < sampleH(x - 8, y) - 2) && (H[k] < sampleH(x, y + 8) - 1 || H[k] < sampleH(x, y - 8) - 1)) S[k] = SURF.crevasse;
 	}
 }
@@ -941,7 +941,9 @@ const sRGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), p
 const ZONES = [
 	{ id: "storm_peaks", letter: "1", name: "Storm peaks", ground: [104, 110, 106], groundAlt: [122, 130, 112], layers: { stones: 0.55, grass: 0.25, soil: 0.2 } },
 	{ id: "desert", letter: "2", name: "the Desert", ground: [214, 186, 132], groundAlt: [200, 166, 110], layers: { sand: 0.95, stones: 0.05 } },
-	{ id: "forest", letter: "3", name: "the Ancient forest", ground: [72, 112, 54], groundAlt: [92, 122, 60], layers: { grass: 0.4, litter: 0.3, moss: 0.3 } },
+	// (round 10: litter and moss trading places in patches (WRLand HfLayers) read from the air as hard lime blotches by
+	// the forest fort; the Forest's own ground comes with its slice) grass, litter and soil, no moss
+	{ id: "forest", letter: "3", name: "the Ancient forest", ground: [72, 112, 54], groundAlt: [92, 122, 60], layers: { grass: 0.55, litter: 0.25, soil: 0.2 } },
 	{ id: "tundra", letter: "4", name: "the Frozen tundra", ground: [226, 232, 238], groundAlt: [198, 212, 224], layers: { sand: 0.8, stones: 0.2 } },
 	{ id: "swamp", letter: "5", name: "the Swamp", ground: [80, 86, 54], groundAlt: [94, 98, 62], layers: { moss: 0.5, soil: 0.5 } },
 	{ id: "ocean", letter: "6", name: "the Ocean shore", ground: [176, 178, 136], groundAlt: [122, 150, 92], layers: { sand: 0.5, grass: 0.5 } },
@@ -989,14 +991,17 @@ const land = {
 	// (round 9) moss on the dry ground beside the stream and the lake's bank: one sample out, a little (WRLand HfLayers;
 	// at 2 samples and 0.7 it drew a pale lime band stepped along both sides of the stream)
 	dampMoss: [1, 0.25],
+	// (round 10) the soft surfaces (areas: snow, moss, cinder; the stream's bed and bank) blended over a ragged ring this
+	// many metres round each sample (WRLand HfSoftRing): their edges stepped along the 4 m samples.
+	surfaceBlend: 7,
 	zoneBiomes: ZONE_BIOME,
 	groundMaterial: "/Game/Terrain/M_IslandGround.M_IslandGround",
 	// Each zone carries its own biome: zoneBiomes is a JSON object, and the game matches its keys without case ("c" = "C").
 	zones: ZONES.map((z) => ({ id: z.id, letter: z.letter, name: z.name, biome: ZONE_BIOME[z.letter], ground: z.ground, groundAlt: z.groundAlt, ...(z.slopeRock ? { slopeRock: z.slopeRock } : {}), rough: 0.9, ...(z.speck ? { speck: z.speck } : {}), layers: z.layers })),
 	surfaces: [
-		{ id: "bed", class: SURF.bed, color: [70, 76, 78], rough: 0.45, layers: { stones: 0.85, sand: 0.15 } },
+		{ id: "bed", class: SURF.bed, soft: 1, color: [70, 76, 78], rough: 0.45, layers: { stones: 0.85, sand: 0.15 } },
 		// (round 9: its moss layer drew a lime stripe round the lake and down the stream: the water's edge mud and trodden grass)
-		{ id: "bank", class: SURF.bank, color: [72, 78, 50], rough: 0.6, layers: { grass: 0.45, soil: 0.45, stones: 0.1 } },
+		{ id: "bank", class: SURF.bank, soft: 1, color: [72, 78, 50], rough: 0.6, layers: { grass: 0.45, soil: 0.45, stones: 0.1 } },
 		{ id: "sand", class: SURF.sand, color: [182, 168, 134], rough: 0.8, layers: { sand: 1 } },
 		{ id: "shore_rock", class: SURF.shore_rock, color: [110, 106, 100], rough: 0.8, layers: { stones: 0.9, sand: 0.1 } },
 		{ id: "verge", class: SURF.verge, color: [104, 112, 70], rough: 0.85, layers: { grass: 0.55, soil: 0.3, stones: 0.15 } },
@@ -1016,36 +1021,36 @@ const land = {
 		{ id: "ploughed2", class: SURF.ploughed2, color: [78, 58, 42], rough: 0.95, layers: { soil: 1 } },
 		{ id: "fallow", class: SURF.fallow, color: [126, 146, 72], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
 		{ id: "fallow2", class: SURF.fallow2, color: [118, 136, 66], rough: 0.9, layers: { grass: 0.8, soil: 0.2 } },
-		{ id: "ash", class: SURF.ash, color: [88, 90, 98], rough: 0.95, layers: { sand: 0.6, soil: 0.25, stones: 0.15 } },
+		{ id: "ash", class: SURF.ash, soft: 1, color: [88, 90, 98], rough: 0.95, layers: { sand: 0.6, soil: 0.25, stones: 0.15 } },
 		{ id: "black_sand", class: SURF.black_sand, color: [56, 54, 57], rough: 0.85, layers: { sand: 0.7, stones: 0.3 } },
-		{ id: "pahoehoe", class: SURF.pahoehoe, color: [72, 70, 74], rough: 0.55, layers: { stones: 0.8, soil: 0.2 } },
-		{ id: "aa", class: SURF.aa, color: [84, 78, 76], rough: 0.95, layers: { stones: 1 } },
-		{ id: "obsidian", class: SURF.obsidian, color: [58, 56, 66], rough: 0.55, layers: { stones: 1 } },
-		{ id: "sulfur", class: SURF.sulfur, color: [178, 160, 98], rough: 0.85, layers: { sand: 0.6, stones: 0.4 } },
-		{ id: "steam_ground", class: SURF.steam_ground, color: [160, 154, 140], rough: 0.8, layers: { sand: 0.5, soil: 0.5 } },
+		{ id: "pahoehoe", class: SURF.pahoehoe, soft: 1, color: [72, 70, 74], rough: 0.55, layers: { stones: 0.8, soil: 0.2 } },
+		{ id: "aa", class: SURF.aa, soft: 1, color: [84, 78, 76], rough: 0.95, layers: { stones: 1 } },
+		{ id: "obsidian", class: SURF.obsidian, soft: 1, color: [58, 56, 66], rough: 0.55, layers: { stones: 1 } },
+		{ id: "sulfur", class: SURF.sulfur, soft: 1, color: [178, 160, 98], rough: 0.85, layers: { sand: 0.6, stones: 0.4 } },
+		{ id: "steam_ground", class: SURF.steam_ground, soft: 1, color: [160, 154, 140], rough: 0.8, layers: { sand: 0.5, soil: 0.5 } },
 		{ id: "acid", class: SURF.acid, color: [60, 118, 108], rough: 0.25, layers: { sand: 1 } },
-		{ id: "basalt", class: SURF.basalt, color: [80, 78, 80], rough: 0.85, layers: { stones: 0.9, soil: 0.1 } },
-		{ id: "scoria", class: SURF.scoria, color: [98, 50, 38], rough: 0.95, layers: { stones: 0.7, sand: 0.3 } },
-		{ id: "cinder", class: SURF.cinder, color: [94, 84, 76], rough: 0.95, layers: { soil: 0.5, stones: 0.5 } },
-		{ id: "cinder_grass", class: SURF.cinder_grass, color: [80, 90, 54], rough: 0.9, layers: { grass: 0.6, soil: 0.4 } },
-		{ id: "kipuka", class: SURF.kipuka, color: [72, 90, 60], rough: 0.9, layers: { litter: 0.5, moss: 0.3, grass: 0.2 } },
+		{ id: "basalt", class: SURF.basalt, soft: 1, color: [80, 78, 80], rough: 0.85, layers: { stones: 0.9, soil: 0.1 } },
+		{ id: "scoria", class: SURF.scoria, soft: 1, color: [98, 50, 38], rough: 0.95, layers: { stones: 0.7, sand: 0.3 } },
+		{ id: "cinder", class: SURF.cinder, soft: 1, color: [94, 84, 76], rough: 0.95, layers: { soil: 0.5, stones: 0.5 } },
+		{ id: "cinder_grass", class: SURF.cinder_grass, soft: 1, color: [80, 90, 54], rough: 0.9, layers: { grass: 0.6, soil: 0.4 } },
+		{ id: "kipuka", class: SURF.kipuka, soft: 1, color: [72, 90, 60], rough: 0.9, layers: { litter: 0.5, moss: 0.3, grass: 0.2 } },
 		{ id: "lava", class: SURF.lava, color: [232, 92, 26], rough: 0.6, layers: { stones: 1 } },
 		{ id: "lava_crust", class: SURF.lava_crust, color: [66, 60, 58], rough: 0.95, layers: { stones: 1 } },
-		{ id: "snow", class: SURF.snow, color: [238, 242, 245], rough: 0.8, layers: { sand: 0.9, stones: 0.1 } },
-		{ id: "snow_forest", class: SURF.snow_forest, color: [214, 222, 224], rough: 0.85, layers: { sand: 0.6, litter: 0.4 } },
-		{ id: "lake_ice", class: SURF.lake_ice, color: [118, 156, 186], rough: 0.42, layers: { stones: 0.5, sand: 0.5 } },
-		{ id: "glacier", class: SURF.glacier, color: [198, 222, 238], rough: 0.3, layers: { sand: 0.8, stones: 0.2 } },
+		{ id: "snow", class: SURF.snow, soft: 1, color: [238, 242, 245], rough: 0.8, layers: { sand: 0.9, stones: 0.1 } },
+		{ id: "snow_forest", class: SURF.snow_forest, soft: 1, color: [214, 222, 224], rough: 0.85, layers: { sand: 0.6, litter: 0.4 } },
+		{ id: "lake_ice", class: SURF.lake_ice, soft: 1, color: [118, 156, 186], rough: 0.42, layers: { stones: 0.5, sand: 0.5 } },
+		{ id: "glacier", class: SURF.glacier, soft: 1, color: [198, 222, 238], rough: 0.3, layers: { sand: 0.8, stones: 0.2 } },
 		{ id: "crevasse", class: SURF.crevasse, color: [92, 148, 200], rough: 0.4, layers: { stones: 1 } },
-		{ id: "thaw_moss", class: SURF.thaw_moss, color: [104, 106, 72], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },
+		{ id: "thaw_moss", class: SURF.thaw_moss, soft: 1, color: [104, 106, 72], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },
 		{ id: "shingle", class: SURF.shingle, color: [120, 124, 126], rough: 0.85, layers: { stones: 1 } },
-		{ id: "ice", class: SURF.ice, color: [128, 174, 208], rough: 0.4, layers: { stones: 0.4, sand: 0.6 } },
-		{ id: "steppe", class: SURF.steppe, color: [168, 148, 96], rough: 0.92, layers: { grass: 0.75, soil: 0.25 } },
-		{ id: "ash_pale", class: SURF.ash_pale, color: [118, 118, 122], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
+		{ id: "ice", class: SURF.ice, soft: 1, color: [128, 174, 208], rough: 0.4, layers: { stones: 0.4, sand: 0.6 } },
+		{ id: "steppe", class: SURF.steppe, soft: 1, color: [168, 148, 96], rough: 0.92, layers: { grass: 0.75, soil: 0.25 } },
+		{ id: "ash_pale", class: SURF.ash_pale, soft: 1, color: [118, 118, 122], rough: 0.95, layers: { soil: 0.5, stones: 0.25, sand: 0.25 } },
 		{ id: "charcoal", class: SURF.charcoal, color: [78, 74, 72], rough: 0.95, layers: { soil: 0.6, litter: 0.4 } },
-		{ id: "lichen_rock", class: SURF.lichen_rock, color: [176, 150, 100], rough: 0.85, layers: { stones: 0.8, moss: 0.2 } },
-		{ id: "pumice", class: SURF.pumice, color: [112, 109, 104], rough: 0.9, layers: { stones: 0.6, sand: 0.4 } },
-		{ id: "moraine", class: SURF.moraine, color: [170, 172, 176], rough: 0.85, layers: { stones: 0.7, sand: 0.3 } },
-		{ id: "copper", class: SURF.copper, color: [52, 84, 72], rough: 0.6, layers: { stones: 1 } },
+		{ id: "lichen_rock", class: SURF.lichen_rock, soft: 1, color: [176, 150, 100], rough: 0.85, layers: { stones: 0.8, moss: 0.2 } },
+		{ id: "pumice", class: SURF.pumice, soft: 1, color: [112, 109, 104], rough: 0.9, layers: { stones: 0.6, sand: 0.4 } },
+		{ id: "moraine", class: SURF.moraine, soft: 1, color: [170, 172, 176], rough: 0.85, layers: { stones: 0.7, sand: 0.3 } },
+		{ id: "copper", class: SURF.copper, soft: 1, color: [52, 84, 72], rough: 0.6, layers: { stones: 1 } },
 		{ id: "oxide", class: SURF.oxide, color: [116, 66, 40], rough: 0.85, layers: { sand: 0.5, stones: 0.5 } },
 		{ id: "snow_crack", class: SURF.snow_crack, color: [168, 184, 202], rough: 0.8, layers: { sand: 0.7, stones: 0.3 } },
 		{ id: "moss_crack", class: SURF.moss_crack, color: [86, 90, 62], rough: 0.9, layers: { moss: 0.5, soil: 0.5 } },

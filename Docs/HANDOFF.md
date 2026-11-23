@@ -991,6 +991,20 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   block (LAND.lake.stream, with each point's water level), its reeds from hearthmoot.mjs (RD).
 - **Road verges**: a main road's bed is still 12 m (round_ground.mjs TRUNK_W) but its gravel only ROAD_TRACK of it; the rest
   is surface 58 `verge` (WRRoundIsland StepCover grows thin grass there).
+- **Soft surfaces** (round 10): a land file's surface with `soft` 1 is an area, blended over a ragged ring of nine
+  samples `surfaceBlend` m round each sample (WRLand HfSoftRing, in HfGround and HfLayers); others (roads, fields,
+  cracks, beaches) keep the old sharp edge. The round island: 7 m. Grass cover asks its kind `coverEdgeJitter` m off.
+- **The lake's water** (round 10): `roundIsland.lakeMaterial` is the pack's M_Water_Opaque (opaque: Lumen reflects into
+  it), lakeLift 0, colours in lakeVectors (sRGB by parameter name). The sea's MI_Ocean needed lakeLift 100.
+- **Shoes** (round 10): a look's `shoes` {mesh, material, ankleToBall} (on its legs piece's look) puts a static mesh on
+  foot_l/foot_r, placed from the body's bind pose (ankle over the ground, toe toward ball_l/r, scaled by that length over
+  ankleToBall, 14 cm for SM_Shoe_A).
+- **Hair (open)**: every groom is drawn at the face mesh's rest pose, so it sits a hand below the posed head (the beard at
+  the throat). Ruled out in round 10: the townsfolk's plain face (with the face rig on it's the same), the groom's LOD
+  (forced 0, 1 and 3: the same), Nanite (the faces aren't) and the skin cache (on). Without its binding, on the body's head
+  bone set off by the face's rest head, it follows the head but sits on the generic head (a few cm off; short hair still
+  hidden); with the binding, it ignores where it's attached (on the body it threw the hair out in spikes). Next: why the
+  binding's skinning never moves it (the binding's target is the face mesh, num_interpolation_points 100).
 - **NaN vertices**: `FMath::Pow(FMath::Sin(PI * t), e)` at t = 1 is NaN (sin(PI) is a hair below 0 in floats), and a NaN
   vertex gives the component NaN bounds (an ensure). Clamp the sine: `FMath::Pow(FMath::Max(0.f, FMath::Sin(...)), e)`.
 - **Building materials** (`Tools/make_build_materials.py`, `make_build_materials_tinted.py`): stone is SimpleRocks'

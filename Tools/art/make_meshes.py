@@ -1611,6 +1611,40 @@ def rowboat(name, seed):
     save(mesh, name)
 
 
+def shoe(name, seed):
+    """A townsman's shoe (round 10: Hearthmoot's people went barefoot under their clothes): a turnshoe with an ankle
+    collar, for a foot whose ankle is 14 cm behind the ball of its foot (the game scales it to each foot: WRHeroLook
+    ApplyShoes). Origin on the ground under the ankle, the toe along +X, a flat sole with a little lip."""
+    raw = Raw()
+    ellipsoid(raw, (-2.6, 0.0, 4.6), (5.0, 4.2, 4.8))       # the heel
+    ellipsoid(raw, (6.0, 0.0, 4.3), (9.6, 5.0, 4.5))        # the instep
+    # (the toes poked out of the first one's front: a longer, higher toe box)
+    ellipsoid(raw, (14.6, 0.0, 3.7), (7.4, 5.6, 3.9))       # over the ball of the foot
+    ellipsoid(raw, (20.6, 0.0, 3.0), (5.0, 5.0, 3.2))       # the toe
+    tube(raw, [(-0.8, 0.0, 3.0), (-0.6, 0.0, 8.0), (-0.2, 0.0, 12.6)], lambda t: (4.9 + 0.3 * t, 4.4 + 0.3 * t), na=20)   # the collar
+    ellipsoid(raw, (-2.4, 0.0, 0.7), (5.5, 4.6, 0.9))       # the sole's lip, a little proud of the upper
+    ellipsoid(raw, (10.8, 0.0, 0.7), (14.6, 6.0, 0.9))
+    mesh = raw.mesh()
+    voxel(mesh, 0.45, close=1.2, smooth_n=3)
+    tool = unreal.DynamicMesh()
+    GS.append_box(tool, opts(), xf((6.0, 0.0, -10.0)), 60.0, 30.0, 10.0, 1, 1, 1, unreal.GeometryScriptPrimitiveOriginMode.BASE)
+    boolean(mesh, tool, unreal.GeometryScriptBooleanOperation.SUBTRACT)
+    unreal.GeometryScript_MeshSimplification.apply_simplify_to_triangle_count(mesh, 1600, unreal.GeometryScriptSimplifyMeshOptions())
+    # Its colour in the vertices (M_HeldTool: RGB linear, A roughness): brown leather, the sole near black, the collar's
+    # turned-down edge a little lighter.
+    VC = unreal.GeometryScript_VertexColors
+    flags = unreal.GeometryScriptColorFlags()
+    VC.set_mesh_constant_vertex_color(mesh, unreal.LinearColor(0.062, 0.036, 0.02, 0.5), flags, True)
+    SEL = unreal.GeometryScript_MeshSelection
+    for lo, hi, colour in (((-40.0, -20.0, -5.0), (40.0, 20.0, 1.3), unreal.LinearColor(0.022, 0.018, 0.016, 0.72)),
+                           ((-40.0, -20.0, 11.4), (40.0, 20.0, 30.0), unreal.LinearColor(0.085, 0.052, 0.03, 0.55))):
+        sel = SEL.select_mesh_elements_in_box(mesh, unreal.Box(unreal.Vector(*lo), unreal.Vector(*hi)), unreal.GeometryScriptMeshSelectionType.VERTICES)
+        sel = sel[1] if isinstance(sel, tuple) else sel
+        VC.set_mesh_selection_vertex_color(mesh, sel, colour, flags)
+    # (Nanite: two hundred townsfolk's shoes kept out of the shadow maps' non-Nanite pass, where the GPU fault lives)
+    save(mesh, name, nanite=True)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1677,6 +1711,7 @@ for i, n in enumerate("ABC"):
     run("wrack", wrack, "SM_Wrack_" + n, 1721 + i)
 run("townprops", awning, "SM_Awning_A", 1901)
 run("townprops", haystack, "SM_Haystack_A", 1902)
+run("shoe", shoe, "SM_Shoe_A", 2001)
 run("townprops", rowboat, "SM_Rowboat_A", 1903)
 for i, n in enumerate("AB"):
     run("crops", crop, "SM_WheatClump_" + n, 1801 + i, "wheat")

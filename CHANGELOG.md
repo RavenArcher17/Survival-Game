@@ -2,6 +2,47 @@
 
 ## Unreleased
 
+### Round island: the look pass, ninth round: the lake, the edges between grounds, shoes and the inn's bar (11-23)
+
+From round 9's open list and a fresh look at the lake, the south-east fort, the stream and Hearthmoot's people (Raven:
+"Keep going").
+- **The lake mirrors its shores:** it was the sea's translucent water lit through the translucency volume, a flat teal
+  sheet that reflected nothing round it. It is the water pack's opaque water now (Lumen reflects the trees, the clouds and
+  the sun on it), drawn at the lake's own level (`roundIsland.lakeLift` 0: the sea's material lifted its surface a
+  metre, which had left a broad strip of bare mud round the shore), deep blue-green (`roundIsland.lakeVectors`, new:
+  a material's colours by name), with no painted cubemap sky (it glowed pale at night). Golden hour and night mirror the
+  sky's own colours. `wr.Lake param` takes names with spaces.
+- **Edges between grounds that don't follow the grid:** a surface the land file marks `soft` (snow, moss, cinder, the
+  lands' ash and lava fields, the stream's bed and bank) is blended over a ragged ring of samples (`surfaceBlend` 7 m,
+  WRLand HfSoftRing, only at an edge: a sample with one surface all round skips it; a road, a field or a crack keeps its
+  sharp edge). A snowfield's edge stepped along the 4 m samples in a staircase, and 2 m of stream bank between 4 m
+  samples came and went, so notches stepped down both banks.
+- **Grass that fades across an edge:** which grass a tuft is asks a few metres off, a different way for each tuft
+  (`roundIsland.coverEdgeJitter` 9 m), and a land's own grass (the Thaw's sedge, the Steppe's) grows wherever its ground
+  lies: the meadow's grass stopped at the zone grid's 16 m squares and cut into the sedge in steps.
+- **The south-east fort out of the snow:** it stands where the Thaw meets the meadow, in a stepped snowfield up to its
+  gate, under falling snow. The Thaw's snow now lies from 90-340 m beyond the meadow's edge (its cracks past 140 m), so the
+  fort stands on moss and sedge. The snow and ash that fall round you follow how deep into the Tundra or the Volcanic you
+  are on the round island (the share of 24 points on rings 250-900 m round the camera in the same land,
+  `fx.weather.roundDeepFrom/Full`), not the Old Island's x (it snowed out of a clear sky at the meadow's edge).
+- **No lime blotches by the forest fort:** the Forest land's first-pass ground traded moss and litter in hard patches
+  (bright lime from the air); grass, litter and soil until its own slice.
+- **No stripes in the moss:** the island ground's moss and soil are drawn at three sizes, turned, in shifting shares (as
+  its grass, round 8); one 2.5 m repeat ran across the Thaw in fine diagonal stripes.
+- **Shoes:** Hearthmoot's people went barefoot under their clothes. Town looks have `shoes` (a turnshoe, Nanite,
+  `make_meshes.py` shoe, its colour in its vertices on M_HeldTool), set on each foot bone from the body's own bind pose
+  and sized to its foot (WRHeroLook ApplyShoes).
+- **Plain shirts:** the oatmeal neck panel's cut has jagged edges that read as a torn costume; each panel is dyed as its
+  shirt.
+- **The inn's bar:** a slab of a counter and one floating shelf of plain cylinders. Now a boarded back bar on uprights
+  under a cornice, jugs and bottles that read as jugs and bottles, rows of pewter tankards, a panelled counter front over a
+  kick board, tankards and a tap keg on the counter, a board over the bar (their own random stream: nothing else moved).
+- Round-island tests 0 failed; the city 18.0 ms a frame, inside the north-west fort 10.6 ms (last round 18.5 and 10.5).
+  One run of four hit the known GPU fault in the shadow maps' non-Nanite culling (the shoes are Nanite, out of that pass).
+- Open: everyone's hair (the townsfolk's and yours) is drawn where the head is in the face mesh's own rest pose, a hand
+  lower than the head: a beard at the throat, short hair hidden in the collar (Docs/HANDOFF.md "Hair"). The stream's banks
+  still step a little far off, where the ground is drawn from every second sample.
+
 ### Round island: the look pass, eighth round: the forts, the stream, the roads and the rooms (11-23)
 
 From a fresh survey of the forts, the lake, the stream, the main roads, the inn and a hall (31 pictures, Raven: "Keep

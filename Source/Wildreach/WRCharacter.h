@@ -264,6 +264,11 @@ private:
 	UPROPERTY(Transient) TArray<TObjectPtr<class UMaterialInstanceDynamic>> OutfitMIDs;
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<UStaticMeshComponent> Canines;  // Blood path (hero.md 2.6)
 	UPROPERTY(VisibleAnywhere, Category="Mesh") TObjectPtr<USkeletalMeshComponent> HaloCrest; // Ascendant
+	/** A look's shoes (its legs piece's "shoes": the townsfolk's; round 10, they went barefoot), one on each foot bone,
+	 *  made when first worn. */
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> ShoeL;
+	UPROPERTY(Transient) TObjectPtr<UStaticMeshComponent> ShoeR;
+	void ApplyShoes(const TSharedPtr<class FJsonObject>& LegsLook);
 	/** A code-modelled head piece on the head bone (a look row's "headPiece": the Huntsman's crown, the Heartwood circlet;
 	 *  WRHeroLook.cpp), made the first time one is worn; the piece it shows. */
 	UPROPERTY(Transient) TObjectPtr<class UProceduralMeshComponent> HeadPiece;

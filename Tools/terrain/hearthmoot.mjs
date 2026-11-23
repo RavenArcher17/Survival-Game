@@ -615,7 +615,41 @@ for (const q of quarters) {
 				block(F, CYL, WOOD, [-4.8 + k * 1.1, -Y + 0.6, 0.45], [0.75, 0.75, 0.85], { pitch: 90, colour: k % 2 ? beam : darkWood, nosink: true });
 				for (const h of [-0.27, 0.27]) block(F, CYL, TINT, [-4.8 + k * 1.1 + h, -Y + 0.6, 0.45], [0.78, 0.78, 0.05], { pitch: 90, colour: iron, nosink: true });
 			}
-			for (let k = 0; k < 9; k++) block(F, CYL, TINT, [-4.9 + k * 1.0, -Y + 0.55, 2.2], [0.22, 0.22, 0.32], { colour: pick([glass, straw, pal([120, 90, 60], 0, 0.6, 0, 3)]), nosink: true });
+			// (round 10: a slab of a counter, one shelf of plain cylinders floating on a bare wall) the back bar: a boarded back
+			// to the shelves, uprights and a cornice holding them, jugs with necks and bottles on the top shelf, tankards on the
+			// lower, the counter's front panelled over a kick board, tankards and a tap keg on its top, a board over the bar.
+			// (Their own random stream, RB, so nothing else in the town moves.)
+			const RB = PLAN.rng(20261126), pewter = pal([128, 128, 124], 0.7, 0.4, 0, 2);
+			for (let k = 0; k < 9; k++) {
+				const c = pick([glass, straw, pal([120, 90, 60], 0, 0.6, 0, 3)]), x = -4.9 + k * 1.0 + (RB() - 0.5) * 0.25;
+				if (c === glass) {
+					// a dark glass bottle: tall and slim, its neck
+					block(F, CYL, TINT, [x, -Y + 0.55, 2.2], [0.13, 0.13, 0.3], { colour: c, nosink: true });
+					block(F, CYL, TINT, [x, -Y + 0.55, 2.42], [0.05, 0.05, 0.14], { colour: c, nosink: true });
+				} else {
+					// a jug: a round belly, a narrower neck, a handle
+					block(F, SPH, TINT, [x, -Y + 0.55, 2.19], [0.26, 0.26, 0.3], { colour: c, nosink: true });
+					block(F, CYL, TINT, [x, -Y + 0.55, 2.38], [0.12, 0.12, 0.12], { colour: c, nosink: true });
+					block(F, CUBE, TINT, [x + 0.14, -Y + 0.55, 2.24], [0.03, 0.05, 0.16], { colour: c, nosink: true });
+				}
+			}
+			block(F, CUBE, TINT, [-1, -Y + T / 2 + 0.03, 1.75], [9.4, 0.05, 1.9], { colour: darkWood, nosink: true });
+			for (const ux of [-5.6, -1, 3.6]) block(F, CUBE, TINT, [ux, -Y + 0.55, 1.4], [0.12, 0.5, 1.9], { colour: beam, nosink: true });
+			block(F, CUBE, TINT, [-1, -Y + 0.6, 2.62], [9.5, 0.62, 0.12], { colour: beam, nosink: true });
+			for (let k = 0; k < 14; k++) {
+				const x = -5.2 + k * 0.62 + (RB() - 0.5) * 0.12;
+				if (Math.abs(x + 1) < 0.2 || Math.abs(x - 3.6) < 0.2) continue;
+				block(F, CYL, TINT, [x, -Y + 0.5 + (RB() - 0.5) * 0.12, 1.12], [0.12, 0.12, 0.15], { colour: pewter, nosink: true });
+			}
+			for (let k = 0; k < 7; k++) block(F, CUBE, TINT, [-5.3 + k * 1.43, -2.48, 0.6], [0.09, 0.04, 0.96], { colour: beam, nosink: true });
+			block(F, CUBE, TINT, [-1, -2.47, 0.09], [9, 0.07, 0.18], { colour: pal([40, 28, 20], 0, 0.9, 0, 1), nosink: true });
+			for (const [tx, ty] of [[-4.2, -2.75], [-3.9, -3.0], [0.8, -2.8], [2.6, -2.9]]) block(F, CYL, TINT, [tx + (RB() - 0.5) * 0.1, ty, 1.26], [0.12, 0.12, 0.15], { colour: pewter, nosink: true });
+			block(F, CYL, WOOD, [-5.2, -2.95, 1.42], [0.48, 0.48, 0.6], { pitch: 90, colour: beam, nosink: true });
+			for (const h of [-0.2, 0.2]) block(F, CYL, TINT, [-5.2 + h, -2.95, 1.42], [0.5, 0.5, 0.04], { pitch: 90, colour: iron, nosink: true });
+			block(F, CYL, TINT, [-5.2, -2.68, 1.36], [0.05, 0.05, 0.12], { pitch: 90, yawAdd: 90, colour: pal([150, 112, 50], 0.8, 0.35, 0, 2), nosink: true });
+			block(F, CUBE, TINT, [-1, -Y + T / 2 + 0.05, 3.35], [3.4, 0.06, 0.95], { colour: darkWood, nosink: true });
+			block(F, CUBE, TINT, [-1, -Y + T / 2 + 0.085, 3.35], [3.1, 0.03, 0.72], { colour: pal([44, 52, 46], 0, 0.8, 0, 1), nosink: true });
+			block(F, CYL, TINT, [-1, -Y + T / 2 + 0.11, 3.35], [0.5, 0.5, 0.03], { pitch: 90, yawAdd: 90, colour: pal([150, 112, 50], 0.8, 0.35, 0, 2), nosink: true });
 			{
 				const p = person("towngown"), [ix, iy, iz] = F.at(-1, -4.3, 0);
 				people.sellers.push([cm(ix), cm(iy), cm(iz), yawOf(F, 0, 1), "inn", `${p.name} the innkeeper`, p.sex, p.face, p.build, p.outfit]);

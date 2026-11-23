@@ -147,6 +147,25 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     litter_c = lerp(litter_c, mask(litter_far, "r", "g", "b"), mul(wash, k=0.45))
     moss_c, moss_h, moss_n = scan("Moss", 250.0)
     soil_c, soil_h, soil_n = scan("Soil", 250.0)
+    if strong_tint:
+        # (round 10) the moss and the soil again at two more sizes, turned, in shifting shares (as the grass, round 8): the
+        # Thaw's moss repeat ran across it in fine diagonal stripes, seen from any height
+        def multi(short, c0, h0, n0):
+            uv2 = mul(append2(wy, mul(wx, k=-1.0)), k=1.0 / 730.0)
+            uv3 = mul(append2(add(mul(wx, k=0.5), mul(wy, k=0.866)), add(mul(wx, k=-0.866), mul(wy, k=0.5))), k=1.0 / 410.0)
+            c2, n2 = sample(f"{FOLDER}/T_Forest{short}_BCH", uv2), sample(f"{FOLDER}/T_Forest{short}_N", uv2)
+            c3, n3 = sample(f"{FOLDER}/T_Forest{short}_BCH", uv3), sample(f"{FOLDER}/T_Forest{short}_N", uv3)
+            v1 = sat(add(mul(noise(add(mul(xy, k=1.0 / 1500.0), const(3.1))), k=0.25), k=0.34))
+            v2 = sat(add(mul(noise(add(mul(xy, k=1.0 / 1100.0), const(9.7))), k=0.25), k=0.33))
+            v3 = sat(sub(sub(const(1.0), v1), v2))
+            vs = add(add(v1, v2), add(v3, const(0.001)))
+            div = lambda a, b: op(unreal.MaterialExpressionDivide, a, b)
+            c = div(add(add(mul(c0, v1), mul(mask(c2, "r", "g", "b"), v2)), mul(mask(c3, "r", "g", "b"), v3)), vs)
+            nn = div(add(add(mul(n0, v1), mul(n2, v2)), mul(n3, v3)), vs)
+            h = div(add(add(mul(h0, v1), mul(pin(c2, "A"), v2)), mul(pin(c3, "A"), v3)), vs)
+            return c, h, nn
+        moss_c, moss_h, moss_n = multi("Moss", moss_c, moss_h, moss_n)
+        soil_c, soil_h, soil_n = multi("Soil", soil_c, soil_h, soil_n)
     grass_c, grass_h, grass_n = pack("Grass", 400.0)
     if strong_tint:
         # (round 8) the grass again at 9.7 m, turned a quarter, mixed in by a slow wash: its 4 m repeat ran across every

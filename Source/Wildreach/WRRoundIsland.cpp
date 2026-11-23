@@ -638,6 +638,7 @@ void AWRRoundIsland::StepCover()
 			}
 		};
 		const float BladeW = T.Num(TEXT("roundIsland.grassBladeWidth"), 2.2f), BladeT = 0.8f;
+		const float EdgeJitter = T.Num(TEXT("roundIsland.coverEdgeJitter"), 9.f);   // m
 		const FVector2D BladeH(T.Num(TEXT("roundIsland.grassMin"), 20.f), T.Num(TEXT("roundIsland.grassMax"), 50.f));
 		const int32 CropPerCell = int32(T.Num(TEXT("roundIsland.cropPerCell"), 480.f));
 		const float FlowerChance = T.Num(TEXT("roundIsland.flowerChance"), 0.09f);
@@ -646,13 +647,23 @@ void AWRRoundIsland::StepCover()
 		for (int32 n = 0; n < PerCell + CropPerCell; ++n)
 		{
 			const FVector2D M = (FVector2D(C) + FVector2D(Rng.FRand(), Rng.FRand())) * Cell;
-			const TCHAR L = D->GridLetter(M);
-			const bool bMeadow = L == TEXT('M') || L == TEXT('Y') || L == TEXT('C');
 			const int32 I = FMath::RoundToInt((M.X - D->HfOrigin.X) / D->HfStep), J = FMath::RoundToInt((M.Y - D->HfOrigin.Y) / D->HfStep);
 			const uint8 Surf = D->HfSurfaceAt(I, J);
+			// Which grass grows here is asked a few metres off, a different way for each tuft (round 10: the meadow's grass
+			// stopped at the zone grid's 16 m squares and the lands' at their 4 m samples, in staircases): where two meet
+			// they mix over a band. Not off a line's samples (a road, a field), which keep their own edges.
+			const bool bArea = Surf == 0 || D->IsSoftSurface(Surf);
+			const uint32 Hj = HashCombineFast(GetTypeHash(M.X), GetTypeHash(M.Y));
+			const FVector2D Mj = M + FVector2D(float(Hj & 0xffffu) / 65535.f - 0.5f, float(Hj >> 16) / 65535.f - 0.5f) * (2.f * EdgeJitter);
+			const TCHAR L = D->GridLetter(Mj);
+			const bool bMeadow = L == TEXT('M') || L == TEXT('Y') || L == TEXT('C');
+			const uint8 SurfJ = bArea ? D->HfSurfaceAt(FMath::RoundToInt((Mj.X - D->HfOrigin.X) / D->HfStep), FMath::RoundToInt((Mj.Y - D->HfOrigin.Y) / D->HfStep)) : Surf;
 			// Out in the lands, the grassy grounds grow their own (round_ground.mjs SURF): 50 the Mammoth Steppe's dry
 			// grass, 35 the Cinder Terraces' sparse grass, 44 the Thaw's sedge, 36 the kipuka's green.
-			const int32 Wild = bMeadow ? -1 : Surf == 50 ? 0 : Surf == 35 ? 1 : Surf == 44 ? 2 : Surf == 36 ? 3 : -2;
+			// (A land's own grassy ground grows its grass wherever it lies: the zone grid's meadow letters reach up to 60 m
+			// over the meadow's edge in 16 m squares, and their meadow grass cut into the Thaw's sedge in steps.)
+			const int32 WildJ = SurfJ == 50 ? 0 : SurfJ == 35 ? 1 : SurfJ == 44 ? 2 : SurfJ == 36 ? 3 : -2;
+			const int32 Wild = WildJ >= 0 ? WildJ : bMeadow ? -1 : -2;
 			if (Wild == -2) continue;
 			if (Wild >= 0)
 			{
@@ -697,7 +708,7 @@ void AWRRoundIsland::StepCover()
 			const bool bCrop = Surf == 14 || Surf == 15 || Surf == 16 || Surf == 17 || Surf == 18 || Surf == 22 || Surf == 23;
 			if (n >= PerCell && !bCrop) continue;
 			// (58: a road's verge, round 9: grass thinner there, trodden)
-			if (!bCrop && Surf != 0 && Surf != 58) continue;
+			if (!bCrop && Surf != 58 && !bArea) continue;
 			if (Surf == 58 && n >= PerCell * 0.4f) continue;
 			const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
 			if (bCrop && CropMeshes.Num() == 6)
@@ -1295,6 +1306,17 @@ void AWRRoundIsland::BuildWater()
 				{ TEXT("NearNormal_Flatten"), 0.6f }, { TEXT("FarNormal_Flatten"), 0.7f }, { TEXT("Refraction"), 0.01f } };
 			for (const TPair<const TCHAR*, float>& P : Calm) LakeMat->SetScalarParameterValue(P.Key, P.Value);
 			if (const TSharedPtr<FJsonObject> Lk = T.Object(TEXT("roundIsland.lakeScalars"))) for (const TPair<FString, TSharedPtr<FJsonValue>>& P : Lk->Values) LakeMat->SetScalarParameterValue(FName(*P.Key), P.Value->AsNumber());
+			// (round 10) a material's own colours by name, "r,g,b" sRGB (the opaque water's Water_Colour_Dark / _Light): the
+			// sea's water was lit through the translucency volume, a flat teal sheet that mirrored nothing round the lake.
+			if (const TSharedPtr<FJsonObject> Lv = T.Object(TEXT("roundIsland.lakeVectors")))
+			{
+				for (const TPair<FString, TSharedPtr<FJsonValue>>& P : Lv->Values)
+				{
+					TArray<FString> C;
+					P.Value->AsString().ParseIntoArray(C, TEXT(","));
+					if (C.Num() >= 3) LakeMat->SetVectorParameterValue(FName(*P.Key), FLinearColor(FColor(uint8(FCString::Atoi(*C[0])), uint8(FCString::Atoi(*C[1])), uint8(FCString::Atoi(*C[2])))));
+				}
+			}
 			Water->SetMaterial(0, LakeMat);
 		}
 		// The moon on the water (round 7: at night the lake mirrored nothing): the pack's water is lit through the
@@ -1415,7 +1437,8 @@ void AWRRoundIsland::DebugLake(const TArray<FString>& Args)
 		return;
 	}
 	if (!LakeMat) return;
-	if (Args[0] == TEXT("param") && Args.Num() >= 3) LakeMat->SetScalarParameterValue(FName(*Args[1]), FCString::Atof(*Args[2]));
+	// (a name may have spaces: "wr.Lake param Fresnel Power 0.5")
+	if (Args[0] == TEXT("param") && Args.Num() >= 3) LakeMat->SetScalarParameterValue(FName(*FString::Join(TArray<FString>(Args.GetData() + 1, Args.Num() - 2), TEXT(" "))), FCString::Atof(*Args.Last()));
 	else if (Args[0] == TEXT("colour") && Args.Num() >= 5) LakeMat->SetVectorParameterValue(FName(*Args[1]), FLinearColor(FColor(uint8(FCString::Atoi(*Args[2])), uint8(FCString::Atoi(*Args[3])), uint8(FCString::Atoi(*Args[4])))));
 	UE_LOG(LogWildreach, Log, TEXT("LAKE %s"), *FString::Join(Args, TEXT(" ")));
 }

@@ -53,6 +53,9 @@ struct WILDREACH_API FWRLandSurface
 	float SpeckAmount = 0.f, SpeckScale = 4.f;
 	float Layers[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f };
 	bool bLayers = false;
+	/** "soft": an area (snow, moss, cinder), not a line (a road, a bed): blended over the land's surfaceBlend m round each
+	 *  sample, so its edge doesn't step along the 4 m grid (round 10: the snow's edge was a staircase). */
+	bool bSoft = false;
 };
 
 /** A wash of colour over a band of the map (the frost on the tundra neck's ferns): y from Y0 to Y1 m, patchy by noise. */
@@ -232,6 +235,15 @@ struct WILDREACH_API FWRLandDef
 	float DampMost = 0.7f;
 	FBox2D LakeBox = FBox2D(ForceInit);
 	TArray<FWRLandSurface> Surfaces;
+	/** surfaceBlend: the soft surfaces' blend, m (0: none, every surface sharp to its sample as before). */
+	float SurfaceBlend = 0.f;
+	/** Each surface class's entry in Surfaces (256 of them, -1 none), filled as they're read. */
+	TArray<int16> SurfaceIndex;
+	const FWRLandSurface* SurfaceOf(uint8 Cls) const { return SurfaceIndex.Num() == 256 && SurfaceIndex[Cls] >= 0 ? &Surfaces[SurfaceIndex[Cls]] : nullptr; }
+	bool IsSoftSurface(uint8 Cls) const { const FWRLandSurface* S = SurfaceBlend > 0.f ? SurfaceOf(Cls) : nullptr; return S && S->bSoft; }
+	/** The soft blend's ragged ring round sample (I, J): nine samples' classes and weights (the sample itself 2, its ring 1
+	 *  each, 0.5-1 x SurfaceBlend out as the noise turns). False when none of them is a soft surface. */
+	bool HfSoftRing(int32 I, int32 J, uint8 OutCls[9], float OutW[9]) const;
 	TArray<FWRLandBand> Bands;
 	FLinearColor LedgeColor = FLinearColor::Transparent;
 	/** Where bodies are rightly under the ground (no rescue): zone-grid letters, and ways [x1, y1, x2, y2, r] (m). */

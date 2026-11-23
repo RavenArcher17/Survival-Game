@@ -12,6 +12,7 @@
 #include "WRWorldDressing.h"
 #include "WRCharacter.h"
 #include "WRSurvival.h"
+#include "WRLand.h"
 #include "Components/CapsuleComponent.h"
 #include "Components/PointLightComponent.h"
 #include "Engine/World.h"
@@ -181,6 +182,12 @@ void UWRFxSubsystem::TickWeather(float DeltaTime)
 	bool bIsland = UWRDressingSubsystem::FindDressing(GetWorld()) != nullptr && T.Num(TEXT("fx.weather.enabled"), 1.f) > 0.f;
 	// The ash and snow belong to the Old Island's two halves only: keyed on x alone they fell in every land, even under
 	// the sea (landmarks audit 11-18). The biome under the camera, looked up twice a second.
+	// On the round island (its own map) the weather builds up with how deep into its land you are: the share of three rings
+	// round the camera (250, 550 and 900 m) in the same land (round 10: keyed on x it snowed out of a clear sky at the
+	// south-east fort, on the meadow's edge, and over the stream).
+	static bool bRound = false;
+	static float DeepIn = 1.f;
+	static FName HereBiome;
 	{
 		static double NextBiomeCheck = 0.0;
 		static bool bOnFireFrost = true;
@@ -190,14 +197,41 @@ void UWRFxSubsystem::TickWeather(float DeltaTime)
 			NextBiomeCheck = Now + 0.5;
 			const FName B = WRBiome::At(GetWorld(), ViewLocation);
 			bOnFireFrost = B == TEXT("volcanic") || B == TEXT("tundra");
+			HereBiome = B;
+			bRound = WRLand::OwnLandMap();
+			if (bRound && bOnFireFrost)
+			{
+				int32 Same = 0, Asked = 0;
+				for (const float R : { 25000.f, 55000.f, 90000.f })
+				{
+					for (int32 k = 0; k < 8; ++k)
+					{
+						const float A = (k + 0.5f) * (PI / 4.f) + R * 0.00001f;
+						Same += WRBiome::At(GetWorld(), ViewLocation + FVector(FMath::Cos(A) * R, FMath::Sin(A) * R, 0.f)) == B;
+						++Asked;
+					}
+				}
+				DeepIn = float(Same) / float(Asked);
+			}
+			else DeepIn = 1.f;
 		}
 		bIsland = bIsland && bOnFireFrost;
 	}
 	Sheltered = FMath::FInterpTo(Sheltered, ShelterTarget, DeltaTime, 3.f);
-	// The ridge runs down x = 0: tundra east, volcanic west; the weather builds up away from the ridge.
-	const float Start0 = T.Num(TEXT("fx.weather.ridgeStart"), 5000.f), Full = T.Num(TEXT("fx.weather.ridgeFull"), 25000.f);
-	float Snow = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(ViewLocation.X)) * T.Num(TEXT("fx.weather.snow"), 1.f) : 0.f;
-	float Ash = bIsland ? FMath::SmoothStep(Start0, Full, static_cast<float>(-ViewLocation.X)) * T.Num(TEXT("fx.weather.ash"), 1.f) : 0.f;
+	float Snow = 0.f, Ash = 0.f;
+	if (bIsland && bRound)
+	{
+		const float Deep = FMath::SmoothStep(T.Num(TEXT("fx.weather.roundDeepFrom"), 0.55f), T.Num(TEXT("fx.weather.roundDeepFull"), 0.92f), DeepIn);
+		Snow = HereBiome == TEXT("tundra") ? Deep * T.Num(TEXT("fx.weather.snow"), 1.f) : 0.f;
+		Ash = HereBiome == TEXT("volcanic") ? Deep * T.Num(TEXT("fx.weather.ash"), 1.f) : 0.f;
+	}
+	else if (bIsland)
+	{
+		// The ridge runs down x = 0: tundra east, volcanic west; the weather builds up away from the ridge.
+		const float Start0 = T.Num(TEXT("fx.weather.ridgeStart"), 5000.f), Full = T.Num(TEXT("fx.weather.ridgeFull"), 25000.f);
+		Snow = FMath::SmoothStep(Start0, Full, static_cast<float>(ViewLocation.X)) * T.Num(TEXT("fx.weather.snow"), 1.f);
+		Ash = FMath::SmoothStep(Start0, Full, static_cast<float>(-ViewLocation.X)) * T.Num(TEXT("fx.weather.ash"), 1.f);
+	}
 	const FTransform At(ViewLocation);
 	const auto Run = [&](int32& Handle, FName Effect, float Amount)
 	{

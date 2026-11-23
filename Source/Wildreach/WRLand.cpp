@@ -253,8 +253,12 @@ namespace WRLandHfImpl
 				S.Rough = LNum(O, TEXT("rough"), 0.9f);
 				LSpeck(O, S.Speck, S.SpeckAmount, S.SpeckScale);
 				S.bLayers = LLayers(O, S.Layers);
+				S.bSoft = LNum(O, TEXT("soft"), 0.f) > 0.f;
 			}
+			D.SurfaceIndex.Init(-1, 256);
+			for (int32 s = 0; s < D.Surfaces.Num(); ++s) if (D.SurfaceIndex[D.Surfaces[s].Class] < 0) D.SurfaceIndex[D.Surfaces[s].Class] = int16(s);
 		}
+		D.SurfaceBlend = FMath::Max(0.f, LNum(J, TEXT("surfaceBlend"), 0.f));
 		if (J->TryGetArrayField(TEXT("bands"), A))
 		{
 			for (const TSharedPtr<FJsonValue>& V : *A)
@@ -1059,26 +1063,66 @@ FLinearColor FWRLandDef::HfGround(int32 I, int32 J, const FVector& Nrm, float& O
 	const FLinearColor SlopeHere = WSum > 0.f ? SlopeSum / WSum : SlopeRock;
 	OutRough = WSum > 0.f ? RSum / WSum : 0.9f;
 	SpineW = WSum > 0.f ? SpineW / WSum : 0.f;
-	// The sample's surface, softened where its neighbours are something else (a road's edge, a beach's back).
-	const uint8 Cls = HfSurfaceAt(I, J);
-	if (Cls != 0 && Cls != HfHidden)
+	// A surface's own colour here: its tone wandering over 23 m, its specks.
+	const auto SurfaceColour = [&](const FWRLandSurface& S)
 	{
-		for (const FWRLandSurface& S : Surfaces)
+		// (round 8: a 6 m noise sampled every 4 m aliased into stripes across a surface: 23 m)
+		FLinearColor SC = S.Color * (0.9f + 0.2f * (Noise(M / 23.f + FVector2D(4.f, 0.f)) * 0.5f + 0.5f));
+		if (S.Speck.Num() && S.SpeckAmount > 0.f)
 		{
-			if (S.Class != Cls) continue;
+			const float SN = Noise(M / S.SpeckScale + FVector2D(12.f, 3.f)) * 0.5f + 0.5f;
+			SC = FMath::Lerp(SC, WRLandHfImpl::SpeckPick(S.Speck, Noise(M / 17.f) * 0.5f + 0.5f), Smooth(1.f - S.SpeckAmount, 1.f - S.SpeckAmount * 0.5f, SN) * 0.7f);
+		}
+		return SC;
+	};
+	const uint8 Cls = HfSurfaceAt(I, J);
+	// The soft surfaces (areas: snow, moss, cinder) over a ragged ring of samples, the zone's own ground where the ring finds
+	// none (round 10: a snowfield's edge stepped along the 4 m samples); a line's sample (a road) leaves it to those round it.
+	uint8 RC[9];
+	float RW[9];
+	if (HfSoftRing(I, J, RC, RW))
+	{
+		// (each surface's colour once: a ring is mostly one or two of them, and the colour costs a few noises)
+		uint8 Seen[9];
+		float SeenW[9];
+		int32 NSeen = 0;
+		float WZone = 0.f, WAll = 0.f;
+		for (int32 n = 0; n < 9; ++n)
+		{
+			const FWRLandSurface* S = RC[n] == 0 || RC[n] == HfHidden ? nullptr : SurfaceOf(RC[n]);
+			if (S && !S->bSoft) continue;
+			WAll += RW[n];
+			if (!S) { WZone += RW[n]; continue; }
+			int32 k = 0;
+			while (k < NSeen && Seen[k] != RC[n]) ++k;
+			if (k == NSeen) { Seen[NSeen] = RC[n]; SeenW[NSeen++] = 0.f; }
+			SeenW[k] += RW[n];
+		}
+		if (WAll > 0.f)
+		{
+			FLinearColor Acc = C * WZone;
+			float RAcc = OutRough * WZone;
+			for (int32 k = 0; k < NSeen; ++k)
+			{
+				const FWRLandSurface& S = *SurfaceOf(Seen[k]);
+				Acc += FMath::Lerp(C, SurfaceColour(S), 0.9f) * SeenW[k];
+				RAcc += FMath::Lerp(OutRough, S.Rough, 0.9f) * SeenW[k];
+			}
+			C = Acc / WAll;
+			OutRough = RAcc / WAll;
+		}
+	}
+	// The sample's surface, softened where its neighbours are something else (a road's edge, a beach's back).
+	if (Cls != 0 && Cls != HfHidden && !IsSoftSurface(Cls))
+	{
+		if (const FWRLandSurface* SP = SurfaceOf(Cls))
+		{
+			const FWRLandSurface& S = *SP;
 			int32 Same = 0;
 			Same += HfSurfaceAt(I + 1, J) == Cls; Same += HfSurfaceAt(I - 1, J) == Cls; Same += HfSurfaceAt(I, J + 1) == Cls; Same += HfSurfaceAt(I, J - 1) == Cls;
-			// (round 8: a 6 m noise sampled every 4 m aliased into stripes across a surface: 23 m)
-			FLinearColor SC = S.Color * (0.9f + 0.2f * (Noise(M / 23.f + FVector2D(4.f, 0.f)) * 0.5f + 0.5f));
-			if (S.Speck.Num() && S.SpeckAmount > 0.f)
-			{
-				const float SN = Noise(M / S.SpeckScale + FVector2D(12.f, 3.f)) * 0.5f + 0.5f;
-				SC = FMath::Lerp(SC, WRLandHfImpl::SpeckPick(S.Speck, Noise(M / 17.f) * 0.5f + 0.5f), Smooth(1.f - S.SpeckAmount, 1.f - S.SpeckAmount * 0.5f, SN) * 0.7f);
-			}
 			const float W = 0.5f + 0.4f * (Same / 4.f);
-			C = FMath::Lerp(C, SC, W);
+			C = FMath::Lerp(C, SurfaceColour(S), W);
 			OutRough = FMath::Lerp(OutRough, S.Rough, W);
-			break;
 		}
 	}
 	// Colour bands (the frost on the tundra neck's ferns), patchy, never on the water's own ground.
@@ -1136,6 +1180,50 @@ float FWRLandDef::HfWet(int32 I, int32 J) const
 	return Wet * Wet * (3.f - 2.f * Wet);
 }
 
+bool FWRLandDef::HfSoftRing(int32 I, int32 J, uint8 OutCls[9], float OutW[9]) const
+{
+	if (SurfaceBlend <= 0.f || SurfaceIndex.Num() != 256) return false;
+	// First the square the ring can reach, without noise: no soft surface in it, no ring; all one soft surface, the ring is
+	// all that (most of a snowfield's samples), so only an edge pays for the ragged ring.
+	const int32 Reach = FMath::CeilToInt(SurfaceBlend / HfStep);
+	const uint8 C0 = HfSurfaceAt(I, J);
+	bool bAnySoft = false, bSame = true;
+	for (int32 dj = -Reach; dj <= Reach; ++dj)
+	{
+		for (int32 di = -Reach; di <= Reach; ++di)
+		{
+			const uint8 Cn = HfSurfaceAt(I + di, J + dj);
+			bSame &= Cn == C0;
+			if (!bAnySoft) { const FWRLandSurface* S = SurfaceOf(Cn); bAnySoft = S && S->bSoft; }
+		}
+	}
+	if (!bAnySoft) return false;
+	if (bSame)
+	{
+		for (int32 n = 0; n < 9; ++n) { OutCls[n] = C0; OutW[n] = n ? 1.f : 2.f; }
+		return true;
+	}
+	const FVector2D M = HfOrigin + FVector2D(float(I), float(J)) * HfStep;
+	const float Turn = Noise(M / 29.f + FVector2D(4.1f, 7.3f)) * PI, Spread = Noise(M / 11.f + FVector2D(2.3f, 5.f)) * 0.5f + 0.5f;
+	for (int32 n = 0; n < 9; ++n)
+	{
+		int32 SI = I, SJ = J;
+		OutW[n] = 2.f;
+		if (n > 0)
+		{
+			// each ring point out its own way, 0.5-1 x surfaceBlend (one noise and the golden ratio: nine noises a sample
+			// made a chunk's ground slow to build)
+			const float A = Turn + (n - 1) * (PI / 4.f);
+			const float R = SurfaceBlend * (0.5f + 0.5f * FMath::Frac(Spread + n * 0.618034f)) / HfStep;
+			SI = I + FMath::RoundToInt(FMath::Cos(A) * R);
+			SJ = J + FMath::RoundToInt(FMath::Sin(A) * R);
+			OutW[n] = 1.f;
+		}
+		OutCls[n] = HfSurfaceAt(SI, SJ);
+	}
+	return true;
+}
+
 void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
 {
 	for (int32 k = 0; k < 6; ++k) Out[k] = 0.f;
@@ -1171,18 +1259,33 @@ void FWRLandDef::HfLayers(int32 I, int32 J, float Out[6]) const
 	const float Shift = FMath::Clamp(Patch, -0.5f, 0.5f) * FMath::Min(Out[0], Out[1]) * 1.6f;
 	Out[0] = FMath::Max(0.f, Out[0] - Shift);
 	Out[1] = FMath::Max(0.f, Out[1] + Shift);
-	// The sample's surface over it (a river bed's stones, a trail's trodden soil), softened where its neighbours differ.
+	// The soft surfaces' mix over their ragged ring (as their colour, HfGround), the zone's where the ring finds none.
 	const uint8 Cls = HfSurfaceAt(I, J);
-	if (Cls != 0 && Cls != HfHidden)
+	uint8 RC[9];
+	float RW[9];
+	if (HfSoftRing(I, J, RC, RW))
 	{
-		for (const FWRLandSurface& S : Surfaces)
+		float Acc[6] = { 0.f, 0.f, 0.f, 0.f, 0.f, 0.f }, WAcc = 0.f;
+		for (int32 n = 0; n < 9; ++n)
 		{
-			if (S.Class != Cls || !S.bLayers) continue;
+			const FWRLandSurface* S = RC[n] == 0 || RC[n] == HfHidden ? nullptr : SurfaceOf(RC[n]);
+			if (S && !S->bSoft) continue;
+			const float* From = S && S->bLayers ? S->Layers : Out;
+			for (int32 k = 0; k < 6; ++k) Acc[k] += From[k] * RW[n];
+			WAcc += RW[n];
+		}
+		if (WAcc > 0.f) for (int32 k = 0; k < 6; ++k) Out[k] = Acc[k] / WAcc;
+	}
+	// The sample's surface over it (a river bed's stones, a trail's trodden soil), softened where its neighbours differ.
+	if (Cls != 0 && Cls != HfHidden && !IsSoftSurface(Cls))
+	{
+		const FWRLandSurface* S = SurfaceOf(Cls);
+		if (S && S->bLayers)
+		{
 			int32 Same = 0;
 			Same += HfSurfaceAt(I + 1, J) == Cls; Same += HfSurfaceAt(I - 1, J) == Cls; Same += HfSurfaceAt(I, J + 1) == Cls; Same += HfSurfaceAt(I, J - 1) == Cls;
 			const float W = 0.5f + 0.5f * (Same / 4.f);
-			for (int32 k = 0; k < 6; ++k) Out[k] = FMath::Lerp(Out[k], S.Layers[k], W);
-			break;
+			for (int32 k = 0; k < 6; ++k) Out[k] = FMath::Lerp(Out[k], S->Layers[k], W);
 		}
 	}
 	// Damp ground beside water grows moss (a bank's edge; Trails' creek-bank strip).
