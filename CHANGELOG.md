@@ -2,6 +2,28 @@
 
 ## Unreleased
 
+### Every armour set the right way out and in its own colours (11-23)
+
+Raven: "Keep at it until they look perfect/correct". Every set worn by the bot, front and back, men and women.
+- **Inside-out armour, everywhere:** the kilt wasn't alone. Of the 408 outfit meshes (16 sets x head, chest, hands, legs
+  x six bodies, and the starter clothes), 270 had parts wound inside out: helmets, plates, scale, laces, fur, coats. Seen
+  through their near side, each showed the shadowed inside of its far side: black tights, dark plates, hollow helmets.
+  `Tools/art/check_outfit_winding.py` finds them piece by piece (triangles joined by shared vertices, so a coat's tail
+  is judged on its own) and with WR_FIX=1 turns them, normals and bone weights kept, every detail level; a second scan
+  finds none.
+- **Trim as a tint, not paint:** the lab's meshes mark whole garments as "trim", which drew them flat in the set's
+  element colour: Wardcloth's and Rimeguard's tights neon purple, Skysilk's cyan, the bronze and copper sets' cloth red.
+  M_WR_Armor and M_WR_Garment now blend trim by `TrimAmount` (0.4; `Tools/art/fix_outfit_trim.py`): the element colour
+  tints each set over its own stuff.
+- **Per-material corrections** (`Tools/art/tune_outfit_materials.py`): Forgeplate's molten cracks fewer, larger and
+  dimmer (they glowed small and even all over, a leopard print); Rimeguard's fur pale frost grey (the brown fur x4 drew
+  a tan ring like a bread roll at the neck); Dunewrap's gold collar worked gold, its sash and headcloth unbleached linen
+  (they were paper-white).
+- The look check equips four pieces at a time from `WRGive` and `WREquip`; past about eight sets the bag fills and
+  the rest silently don't go on, so the checks run eight sets per game.
+- Round-island tests 0 failed; the city 18.2 ms a frame, inside the north-west fort 9.8 ms.
+- Open: Rimeguard's and Dunewrap's collars are smooth rings standing off the neck (their mesh's shape, the lab's).
+
 ### Your clothes and gear; women's hair (11-23)
 
 Raven: "Also fix the cloths and stuff on the player".

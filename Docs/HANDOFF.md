@@ -1009,6 +1009,10 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   Not only the lashes: every woman's hairstyle and some brows and lashes are made round MH_Groom_Head (eyes at z 149.3,
   not SKM_Face's 160.4): a groom whose own top is under its slot's split (hair 167, moustache 151, others 156.5 cm) is
   raised hero.groomLowShift first; the eyelashes then fit by the eyes (hero.lashTemplate, SKM_Face's eyes).
+- **Outfit meshes** (round 11): the lab's outfits came with parts wound inside out (270 of 408 meshes);
+  Tools/art/check_outfit_winding.py checks them (WR_FIX=1 turns them). Run it on any outfit mesh brought in. Trim (vertex
+  colour R) blends by the base materials' TrimAmount (0.4, Tools/art/fix_outfit_trim.py); per-material looks in
+  Tools/art/tune_outfit_materials.py. A bot can wear a set: WRGive <item> 1 then WREquip <item> (8 sets a game).
 - **The Survivor Wraps** (round 11): all trim on M_WR_Garment (TrimColor is their colour); the look's materials map
   gives each part its own (Tools/art/make_wraps_look.py). Their kilt was wound inside out; Tools/art/fix_wraps_kilt.py
   reversed it (it checks first: running it again leaves it). The sword and shield wear M_PropMetal (metal found by colour). Far ground (WRLand BuildLodChunk): a far vertex over any bed (class
