@@ -539,9 +539,10 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		S[k] = z === "V1" ? (fbm(x / 70, y / 70, 97, 2) > 0.55 ? SURF.pumice : SURF.ash) : z === "V2" ? (n > 0.12 ? SURF.aa : SURF.pahoehoe)
 			: z === "V3" ? (fbm(x / 50, y / 50, 98, 2) > 0.55 ? SURF.copper : SURF.obsidian)
 			: z === "V4" ? (fbm(x / 60, y / 60, 1240 + 27, 2) < -0.6 ? SURF.acid
-				// (round 14: at 0.2 a quarter of the Solfatara was flat yellow, a desert from any height; now crusts in
-				// patches over pale altered clay)
-				: fbm(x / 20, y / 20, 1240 + 24, 2) + 0.25 * fbm(x / 6, y / 6, 98, 2) > 0.4 ? SURF.sulfur
+				// (round 14: at 0.2 a quarter of the Solfatara was flat yellow, a desert from any height; on a finer noise of
+				// its own, polka dots. Now a broken crust on the fumarole mounds' tops, the mounds' own field, round_island
+				// V4, the clay showing through it)
+				: ((mf) => mf > 0.26 && fbm(x / 7, y / 7, 98, 2) > 0.15 - (mf - 0.26) * 2.2)(fbm(x / 46, y / 46, 1240 + 24, 2)) ? SURF.sulfur
 				: Math.abs(fbm(x / 160, y / 38, 94, 2)) < 0.035 ? SURF.oxide : SURF.steam_ground)
 			: z === "V5" ? (dv < VOLCANO.crater + 40 ? SURF.scoria : SURF.basalt)
 			: z === "V7" ? (Math.abs(fbm((x * 0.8 + y * 0.6) / 30, (y * 0.8 - x * 0.6) / 110, 99, 2)) < 0.025 ? SURF.charcoal : SURF.ash_pale)
@@ -1078,7 +1079,9 @@ const land = {
 		{ id: "pahoehoe", class: SURF.pahoehoe, soft: 1, color: [72, 70, 74], rough: 0.55, layers: { stones: 0.8, soil: 0.2 } },
 		{ id: "aa", class: SURF.aa, soft: 1, color: [84, 78, 76], rough: 0.95, layers: { stones: 1 } },
 		{ id: "obsidian", class: SURF.obsidian, soft: 1, color: [58, 56, 66], rough: 0.55, layers: { stones: 1 } },
-		{ id: "sulfur", class: SURF.sulfur, soft: 1, color: [198, 184, 118], rough: 0.85, layers: { sand: 0.6, stones: 0.4 } },
+		// (round 14: bright enough that M_IslandGround took it for snow and drew the snow's texture, smooth pale sand; a
+		// crust of stones, just under that)
+		{ id: "sulfur", class: SURF.sulfur, soft: 1, color: [192, 168, 72], rough: 0.85, layers: { stones: 0.65, sand: 0.35 } },
 		// (round 14) altered clay, bleached pale by the steam
 		{ id: "steam_ground", class: SURF.steam_ground, soft: 1, color: [170, 168, 160], rough: 0.8, layers: { sand: 0.5, soil: 0.5 } },
 		{ id: "acid", class: SURF.acid, color: [60, 118, 108], rough: 0.25, layers: { sand: 1 } },

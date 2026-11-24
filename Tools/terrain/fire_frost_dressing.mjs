@@ -78,8 +78,9 @@ const PLAN = {
 	T3: [T("snow_pine", 3, 0.7, 1.2, 26, 0.7), T("frost_shrub", 5, 0.5, 0.9, 30, 0.5), T("ice_boulder", 0.8, 0.6, 1.4, 38)],
 	T4: [T("serac", 0.7, 0.8, 1.45, 45, 0.6, null, [2, 5, 3.5, 9]), T("ice_boulder", 2.5, 0.6, 1.6, 40)],
 	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.18, 0.8, 1.35, 40, 0.6, null, [1, 4, 3.5, 8]), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
-	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("snow_pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
-	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("snow_pine", 0.2, 0.8, 1.1, 24, 0.8)],
+	// (round 14: green pines on the Thaw and the Steppe: the snow-laden spruce stood on their green grass)
+	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
+	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("pine", 0.2, 0.8, 1.1, 24, 0.8)],
 };
 // A hash random per cell (the same on every run).
 const rand = (i, j, k) => { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 2147483647)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };

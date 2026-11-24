@@ -1214,8 +1214,16 @@ function crates(F, x, y) {
 	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + (RF() - 0.5) * 30);
 	const n = 3 + Math.floor(RF() * 3);
 	for (let k = 0; k < n; k++) {
+		// (round 14: bare cubes read as boxes of nothing; now a crate's boards with a batten up each corner and round its
+		// top and foot. The random draws stay in the order they were, so nothing else in the city moves.)
 		const sz = 0.7 + RF() * 0.35, up = k >= 3;
-		block(G, CUBE, WOOD, [(k % 3) * 1.0 - 1 + (up ? 0.5 : 0), (RF() - 0.5) * 0.3, up ? 1.0 + sz / 2 : sz / 2], [sz, sz, sz], { yawAdd: (RF() - 0.5) * 20, colour: pickF([beam, darkWood, pal([120, 92, 60], 0, 0.9, 0, 1)]), solid: !up, nosink: up });
+		const cx = (k % 3) * 1.0 - 1 + (up ? 0.5 : 0), cy = (RF() - 0.5) * 0.3, cz = up ? 1.0 + sz / 2 : sz / 2;
+		const yawAdd = (RF() - 0.5) * 20, colour = pickF([beam, darkWood, pal([120, 92, 60], 0, 0.9, 0, 1)]);
+		block(G, CUBE, WOOD, [cx, cy, cz], [sz, sz, sz], { yawAdd, colour, solid: !up, nosink: up });
+		const a = yawAdd * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a), h = sz / 2 + 0.015, t = 0.07;
+		const at = (u, v, w) => [cx + u * ca - v * sa, cy + u * sa + v * ca, cz + w];
+		for (const [u, v] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) block(G, CUBE, WOOD, at(u * (h - t / 2), v * (h - t / 2), 0), [t, t, sz + 0.02], { yawAdd, colour: darkWood, nosink: true });
+		for (const w of [-1, 1]) for (const [u, v, lx, ly] of [[0, -1, sz, t], [0, 1, sz, t], [-1, 0, t, sz], [1, 0, t, sz]]) block(G, CUBE, WOOD, at(u * (h - t / 2), v * (h - t / 2), w * (sz / 2 - t / 2)), [lx + 0.02, ly + 0.02, t], { yawAdd, colour: darkWood, nosink: true });
 	}
 	for (let k = 0; k < 2; k++) {
 		const bx = 2.0 + k * 0.85;
@@ -1453,9 +1461,13 @@ for (const t of trunks) {
 	const offRoad = (p, m) => PLAN.roads.every((rd) => PLAN.lineDist(p, rd.pts).d > rd.half + m);
 	const spotNear = (r0, not) => { for (let rr = r0; rr < r0 + 30; rr += 2) for (let a = 0; a < 360; a += 15) { const p = [cx + Math.cos(a * RAD) * rr, cy + Math.sin(a * RAD) * rr]; if (offRoad(p, 2.5) && (!not || Math.hypot(p[0] - not[0], p[1] - not[1]) > 5)) return p; } return [cx + r0, cy]; };
 	const [sx0, sy0] = spotNear(9), [px0, py0] = spotNear(7, [sx0, sy0]), G = frame(sx0, sy0, groundAt(sx0, sy0), t.bearing);
-	for (let k = 0; k < 9; k++) { const a = k * 40, rr = 1.6 + R() * 0.6; block(frame(sx0 + Math.cos(a * RAD) * rr, sy0 + Math.sin(a * RAD) * rr, G.z, a), CUBE, STONE, [0, 0, 0.3], [0.9 + R() * 0.4, 0.7, 0.6 + R() * 0.3], { roll: (R() - 0.5) * 16 }); }
-	block(G, CUBE, STONE, [0, 0, 1.6], [1.3, 0.9, 3.2], { solid: true, roll: 3 });
-	block(G, CUBE, STONE, [0, 0.05, 3.55], [1.0, 0.75, 0.9], { roll: -4, nosink: true, pitch: 5 });
+	// (round 14: two blocks of coursed wall stone on a ring of them read as a black chimney stack; now a field stone,
+	// grey with lichen, tapering and leaning a little, on a cairn of rounded stones, the random draws in their order)
+	const fieldGrey = pal([118, 116, 108], 0, 0.92), lichen = pal([132, 128, 104], 0, 0.95);
+	for (let k = 0; k < 9; k++) { const a = k * 40, rr = 1.6 + R() * 0.6; block(frame(sx0 + Math.cos(a * RAD) * rr, sy0 + Math.sin(a * RAD) * rr, G.z, a), SPH, TINT, [0, 0, 0.15], [0.9 + R() * 0.4, 0.75, 0.6 + R() * 0.3], { roll: (R() - 0.5) * 16, colour: k % 3 ? fieldGrey : lichen }); }
+	block(G, CUBE, TINT, [0, 0, 1.0], [1.25, 0.85, 2.0], { solid: true, roll: 3, colour: fieldGrey });
+	block(G, CUBE, TINT, [0.04, 0.03, 2.55], [1.0, 0.7, 1.3], { roll: 5, pitch: 3, yawAdd: 6, nosink: true, colour: lichen });
+	block(G, CUBE, TINT, [0.09, 0.05, 3.45], [0.7, 0.5, 0.75], { roll: 7, pitch: 6, yawAdd: -8, nosink: true, colour: fieldGrey });
 	const P = frame(px0, py0, groundAt(px0, py0), 0), dirs = [];
 	const toward = (p) => Math.atan2(p[1] - py0, p[0] - px0) / RAD;
 	dirs.push(toward(t.points[Math.min(3, t.points.length - 1)]));   // the main road on to Hearthmoot

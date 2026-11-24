@@ -38,16 +38,23 @@ spots) and the Volcanic (34), and everything they turned up.
   bend and taper, roots flared, thick broken stubs and a few long dead limbs, the tops splintered or fallen beside them.
 - **Berry bushes** in the Tundra are frosted over, the berries showing red through it.
 - **The Volcanic's cliffs:** rock panels laid close up every ridge, terrace and lava front read as brick walls. They're
-  gone; its steep ground draws layered rock, flows laid one on another, in the ground's own material. (Growing the
+  gone; its steep ground (and the Tundra's rock) draws layered rock, flows laid one on another in bands lighter and
+  darker, in the ground's own material. (Growing the
   Volcanic's cliffs out of the land as the Tundra's ice is grown was tried: 10,000 more pieces of mesh and 12 GB more
   memory on a client, for little on its dark ridges. It's there, off: landCaves.rockWalls.)
 - **The ash plains** read as beige sand from any height: now grey ash, grey stones in its texture.
-- **The Solfatara** was a quarter flat yellow, a desert: now bleached clay with yellow crusts in small patches.
+- **The Solfatara** was a quarter flat yellow, a desert (its yellow bright enough that the ground drew it as snow's
+  smooth texture): now bleached clay, the sulfur a broken stony crust on the fumarole mounds' tops.
 - **Cinder cones'** red scoria lay round each in a near circle, a disc of paint from the air: now ragged, in tongues
   down its gullies, breaking up at its foot.
 - **The lava river's head** was cut straight across, a flat red triangle on the ash: it now wells out of its vent
   narrow and spreads to its width over the first 60 m.
 - **The kipuka** grew the Tundra's snow-laden spruce: now its green pines, with an old gnarled one here and there.
+- **The Thaw and the Steppe** grow green pines (snow-laden spruce stood on their green grass).
+- **The meadow and Hearthmoot** (surveyed again, 29 and 34 spots): mostly sound. The crates in the forts' and the
+  city's yards were bare cubes: now boards with a batten up each corner and round the top and foot. Each crossroads'
+  waymark was two blocks of coursed wall stone on a ring of them, a black chimney stack: now a grey field stone with
+  lichen, tapering and leaning, on a cairn of rounded stones.
 - **Memory:** the ice walls cost about 2.3 GB on a client and 1.6 GB on the server (measured in the editor's game);
   each cube of cave or wall now keeps only the vertices it draws.
 - **Checked:** the round-island tests pass (0 failed; the city 17.3 ms a frame, the meadow 9.8 ms). The Tundra's

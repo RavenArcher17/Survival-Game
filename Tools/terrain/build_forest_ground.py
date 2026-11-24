@@ -264,8 +264,9 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         fr = frac(add(mul(wz, k=1.0 / 230.0), mul(warp_r, k=1.6)))
         fr2 = frac(add(mul(wz, k=1.0 / 97.0), mul(warp_r, k=0.9)))
         tw = unary(unreal.MaterialExpressionAbs, add(mul(fr, k=2.0), k=-1.0))
-        layers_r = add(mul(sat(mul(add(tw, k=-0.35), k=3.0)), k=0.3), mul(fr2, k=0.12))
-        rock_c = mul(rock_c, add(layers_r, k=0.8))
+        # (0.8-1.2 was too faint to read from the ground; 0.62-1.4)
+        layers_r = add(mul(sat(mul(add(tw, k=-0.35), k=3.0)), k=0.55), mul(fr2, k=0.23))
+        rock_c = mul(rock_c, add(layers_r, k=0.62))
     if strong_tint:
         # (round 7) steep ice stays ice: where the land's colour is bright (the ice shelves' and the glacier's faces,
         # WRLand slopeRock.ice) the snow and ice texture streaks down the face with half the rock's relief; drawn as rock,
