@@ -6,6 +6,7 @@
 #include "WRIslandPlaces.h"
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
+#include "WRGroundTrail.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -516,6 +517,40 @@ namespace WRIsleT
 		const FVector Fire = S.G(-100.f, 200.f);
 		for (int32 k = 0; k < 7; ++k) S.K.Add(P.GraniteDark, FVector(26.f, 22.f, 16.f), Fire + FRotator(0.f, 51.f * k, 0.f).Vector() * 50.f + FVector(0, 0, 8.f), FRotator(0.f, 51.f * k, 0.f));
 		S.K.Add(P.Dark, FVector(70.f, 70.f, 6.f), Fire + FVector(0, 0, 4.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		// (Round 13: three holes and a rack on bare ice, sticks on a grey patch from any way off.) A camp people come back
+		// to: a ridge tent in the lee of the windbreak, the sledge they haul it out on, a log to sit on at each hole and
+		// the morning's catch frozen on the ice beside it, and the snow trodden between them, a track out toward the shore.
+		const FVector Tent = S.G(-200.f, 600.f);
+		S.K.Add(P.Hide, FVector(105.f, 100.f, 110.f), Tent - FVector(0, 0, 4.f), FRotator(0.f, -70.f, 0.f), EWRLookMesh::Tent);   // (a scale: 100 = the mesh's own 2.8 m)
+		Sledge(S, P, S.G(180.f, 560.f), 25.f, 5, true);
+		const FSurf Log = FSurf::Wood(Lin(92, 74, 56));
+		const FSurf Fish = FSurf::Stone(Lin(118, 128, 136), 0.3f);
+		for (int32 h = 0; h < 3; ++h)
+		{
+			const FVector2D Hc(-300.f + 300.f * h, -200.f + 180.f * (h % 2));
+			const FVector Seat = S.G(Hc.X - 20.f, Hc.Y + 95.f);
+			S.K.Add(Log, FVector(26.f, 26.f, 80.f), Seat + FVector(0, 0, 12.f), FRotator(90.f, 15.f * h - 10.f, 0.f), EWRLookMesh::Cylinder);
+			for (int32 k = 0; k < 2 + h % 2; ++k)
+			{
+				const FVector At = S.G(Hc.X + 70.f + 18.f * k, Hc.Y - 60.f + 26.f * k, 4.f);
+				S.K.Add(Fish, FVector(36.f, 9.f, 7.f), At, FRotator(0.f, 70.f + 35.f * k + 20.f * h, 0.f), EWRLookMesh::Sphere);
+			}
+		}
+		if (S.bDraw)
+		{
+			const auto W = [&](float X, float Y) { return FVector2D(S.ToWorld(FVector(X, Y, 0.f))); };
+			const FWRTrailLook Trod = FWRTrailLook::Snow();
+			WRGroundTrail::Patch(S.Owner, S.Root, W(-100.f, 200.f), 170.f, 330.f, Trod, 21);
+			for (int32 h = 0; h < 3; ++h)
+			{
+				const FVector2D Hc(-300.f + 300.f * h, -200.f + 180.f * (h % 2));
+				WRGroundTrail::Path(S.Owner, S.Root, { W(-100.f, 200.f), W((Hc.X - 100.f) * 0.5f + 30.f * (h - 1), (Hc.Y + 200.f) * 0.5f), W(Hc.X, Hc.Y + 60.f) }, 55.f, Trod, 30 + h);
+			}
+			WRGroundTrail::Path(S.Owner, S.Root, { W(-100.f, 200.f), W(100.f, 280.f), W(280.f, 300.f) }, 55.f, Trod, 34);
+			WRGroundTrail::Path(S.Owner, S.Root, { W(-100.f, 200.f), W(-160.f, 380.f), W(-200.f, 470.f) }, 60.f, Trod, 35);
+			WRGroundTrail::Path(S.Owner, S.Root, { W(-100.f, 200.f), W(60.f, 420.f), W(170.f, 520.f) }, 60.f, Trod, 36);
+			WRGroundTrail::Path(S.Owner, S.Root, { W(-260.f, 160.f), W(-900.f, 260.f), W(-1700.f, 180.f), W(-2600.f, 320.f) }, 70.f, Trod, 37);
+		}
 	}
 
 	void DrownedSledge(FWRIsleSite& S, const FPal& P)

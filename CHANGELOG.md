@@ -2,6 +2,34 @@
 
 ## Unreleased
 
+### Round island: the look pass, twelfth round: the Tundra's cave mouths, worn ground, the fishing camp, two collars (11-24)
+
+The eleventh round's rough edges (Raven: "Keep going").
+- **The Tundra's cave mouths:**
+  - **The grey square:** every Tundra cave had a flat, glossy grey square on the snow in front of it. The cave's lip
+    is the ground round its mouth, drawn in the island's ground material, and it put map coordinates in the
+    material's first UV, which that material reads as how wet the shore is. Every lip east of the island's middle
+    drew as soaked ground. It now carries the land's own wetness there, as the land does (WRLandCaves).
+  - **The ice crags:** the crag over each mouth was bare banded blue ice, a jelly on the snow. Its outside is now old
+    ice plastered with snow and rime, the clean blue kept for inside the arch and the cave.
+  - A crag's skin lying on ground the land already draws is left to the land.
+- **Worn ground** (`WRGroundTrail`, new): trails and trodden patches drawn in the land's own ground material, the
+  trail's look along the middle fading to the ground's own at the edges.
+  - In Emberwick and Rimehold the yard round the shrine is trodden, with a path from every door to it. The outer
+    huts' paths join their neighbours' (straight to the middle, they were spokes on a wheel from the air), and a
+    way leads out past the stall along the flagstones.
+  - The ground is trodden ash in Emberwick and packed, dirtied snow in Rimehold.
+- **The ice-fishing camp:** it was three holes and a rack on bare ice. Now there's a ridge tent in the lee of the
+  windbreak, the sledge, a log seat at each hole with the morning's catch on the ice beside it, the snow trodden
+  between them, and a track out toward the shore.
+- **Rimeguard's and Dunewrap's collars** (`Tools/art/fix_collars.py`): both came from the hero lab as rings round the
+  neck, a swim ring from any side.
+  - Rimeguard's white fur ring is now a mantle that drapes over the shoulders and down the back, deepest behind,
+    in tufts, with a trim on the chest.
+  - Dunewrap's lowered hood is now bunched in folds behind the neck, gathering round the sides to a thin V in front.
+  - Only those pieces moved, on every build and LOD; bone weights are kept.
+- **Checked:** the round-island tests pass (0 failed; the city 16.0 ms a frame, the meadow 10.0 ms). A bot walked through all three Tundra caves (131 of 132 legs arrived, as before).
+
 ### Round island: the look pass, eleventh round: the villages, the Crevasse Maze, the frozen lakes (11-23)
 
 From the tenth round's survey of the coast, the Volcanic and the Tundra (Raven: "go ahead and push what's next").

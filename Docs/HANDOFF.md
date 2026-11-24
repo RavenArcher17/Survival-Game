@@ -1014,6 +1014,15 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   windbreak (lavvu) at 2.15 x ring round the back (95-265 degrees); the round island's villages have huts 8
   (fire_frost_dressing.mjs). The Tundra's frozen lakes are ground (lake_ice), not the Old Island's ice sheet (none is
   drawn on the round island).
+- **Worn ground** (round 13): `WRGroundTrail::Path` and `::Patch` lay a ribbon or disc of procedural mesh over a live
+  heightfield land in the land's own material (`AWRLand::GroundLook`). Each vertex carries the land's colour, layers
+  and wetness from its four samples, moved toward an `FWRTrailLook` (`Ash()`, `Snow()`) by the wear, so the edges
+  are the ground's own. Nothing is drawn off a heightfield land (the Old Island). M_IslandGround reads UV0.x as the
+  shore's wetness: anything drawn in it must put the land's `HfWet` there, not map coordinates (the cave lips did,
+  and drew as wet ground).
+- **Collars** (round 13): `Tools/art/fix_collars.py` reshapes Rimeguard's Rime_Fur ring and Dunewrap's Dune_Linen
+  ring on every build and LOD. Run it only on the lab's meshes: a second run deforms them again, so `git checkout`
+  the meshes first.
 - **The Crevasse Maze** (round 12): CrevasseMaze fits a plane to the ground under it and lays the field in that
   plane's frame (yaw so the rows run down the slope, tilted to it; F(x, y, z) maps field -> place). The rows are
   SM_CrevasseRow_0..5, one per row because the shared surface past the ends uses the field's x; they collide as drawn,

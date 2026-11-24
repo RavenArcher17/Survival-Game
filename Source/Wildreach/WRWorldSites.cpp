@@ -9,6 +9,7 @@
 #include "WRFungalTypes.h"
 #include "WRSkyWorld.h"
 #include "WRWorldSystems.h"
+#include "WRGroundTrail.h"
 #include "WRLand.h"
 #include "WRStormTypes.h"
 #include "WRSwampTypes.h"
@@ -1376,6 +1377,7 @@ void AWRVillage::BuildLook()
 	// The huts round the shrine, doors toward it, the front (+X) kept open for the path and the stall. (Round 12: one
 	// perfect ring of the same hut read as a toy camp: two loose rings now, every other hut further out, each its own
 	// size and a little off its place.)
+	TArray<FVector2D> Doors;
 	for (int32 h = 0; h < Huts; ++h)
 	{
 		const FVector Key(float(h) * 97.f, 13.f, 7.f);
@@ -1388,6 +1390,7 @@ void AWRVillage::BuildLook()
 		const float DoorYaw = A + 180.f + 10.f * K.Jit(Key, 34);   // facing the shrine, near enough
 		const FRotator Face(0.f, DoorYaw, 0.f);
 		Household(C, (bLavvu ? 220.f : 260.f) * Sc, DoorYaw, h);
+		Doors.Add(C2 + FVector2D(Face.Vector()) * ((bLavvu ? 220.f : 260.f) * Sc + 40.f));
 		if (!bLavvu)
 		{
 			// A round house of dry-laid basalt: twelve wall runs in three courses, the doorway gap toward the shrine,
@@ -1537,6 +1540,29 @@ void AWRVillage::BuildLook()
 				SiteBlock(this, RootComponent, P + FVector(0, 0, Ht * 0.5f - 8.f), FVector(Len * 0.5f, 26.f, Ht * 0.5f + 8.f), Rot);
 			}
 		}
+	}
+	// (Round 13: the huts stood on bare ash and snow, nothing worn between them.) The ground the village walks on, worn
+	// in the land's own ground (WRGroundTrail): the yard round the shrine trodden, a path from every door to it, the way
+	// out past the stall along the flagstones; trodden ash and earth (Emberwick), packed and dirtied snow (Rimehold).
+	if (bDraw)
+	{
+		const FTransform& Xf = GetActorTransform();
+		const auto W2 = [&](const FVector2D& L) { return FVector2D(Xf.TransformPosition(FVector(L, 0.f))); };
+		const FWRTrailLook Worn = bLavvu ? FWRTrailLook::Snow() : FWRTrailLook::Ash();
+		WRGroundTrail::Patch(this, RootComponent, W2(FVector2D::ZeroVector), Ring * 0.42f, Ring * 0.7f, Worn, 11);
+		// (each outer hut's path joins its inner neighbour's, a way worn between them: every door straight to the middle
+		// read from the air as the spokes of a wheel)
+		for (int32 d = 0; d < Doors.Num(); ++d)
+		{
+			const FVector2D Door = Doors[d];
+			const bool bOuter = d % 2 == 1 && Doors.IsValidIndex(d - 1);
+			const FVector2D To = bOuter ? FMath::Lerp(Doors[d - 1], Doors[d - 1].GetSafeNormal() * Ring * 0.45f, 0.45f) : Door.GetSafeNormal() * Ring * 0.45f;
+			const FVector2D Bend = FVector2D(-(To - Door).Y, (To - Door).X).GetSafeNormal() * FVector2D::Distance(Door, To) * 0.14f * K.Jit(FVector(d * 97.f, 3.f, 1.f), 61);
+			WRGroundTrail::Path(this, RootComponent, { W2(Door), W2((Door + To) * 0.5f + Bend), W2(To) }, (bLavvu ? 85.f : 75.f) * (bOuter ? 0.85f : 1.f), Worn, 100 + d);
+		}
+		const FVector Sl = GetActorTransform().InverseTransformPosition(StallAt());
+		WRGroundTrail::Path(this, RootComponent, { W2(FVector2D(Ring * 0.45f, 0.f)), W2(FVector2D(520.f, 20.f)), W2(FVector2D(1100.f, -25.f)), W2(FVector2D(1750.f, 10.f)) }, 120.f, Worn, 90);
+		WRGroundTrail::Path(this, RootComponent, { W2(FVector2D(Sl.X, 0.f)), W2(FVector2D(Sl) * FVector2D(1.f, 0.55f)), W2(FVector2D(Sl)) }, 90.f, Worn, 91);
 	}
 	// The path in from the steps: flagstones following the ground for 12 m.
 	for (int32 i = 0; i < 14; ++i)

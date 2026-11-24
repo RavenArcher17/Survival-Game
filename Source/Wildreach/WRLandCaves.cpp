@@ -355,7 +355,10 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 		const float BrowHere = -LcBrow(L, Caves, P);
 		const bool bBrowSkin = BrowHere >= GroundTerm - 5.f && BrowHere <= AirHere + 5.f;
 		const bool bGroundSkin = !bBrowSkin && (AirHere > GroundTerm + 5.f || (Nrm.Z > 0.7f && FMath::Abs(GroundTerm) < 30.f));
-		const bool bUnderLand = bGroundSkin && FMath::Abs(GroundTerm) < GroundSkin && LcLandDraws(L, P.X, P.Y);
+		// (round 13: a brow's skin lying on the ground, away from the cave's air, is the ground's too: drawn as the lip over
+		// ground the land draws as well, the two fought, a patchy grey square on the snow in front of each Tundra mouth)
+		const bool bOnGround = FMath::Abs(GroundTerm) < 20.f && Nrm.Z > 0.5f && AirHere > 60.f;
+		const bool bUnderLand = (bGroundSkin || bOnGround) && FMath::Abs(GroundTerm) < GroundSkin && LcLandDraws(L, P.X, P.Y);
 		if (bUnderLand) P.Z -= 4.f;
 		CellVert[((k + 1) * NC + (j + 1)) * NC + (i + 1)] = Verts.Num();
 		Verts.Add(P - ActorLoc);
@@ -413,7 +416,11 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 			{
 				// Snow drifted on the floors; ice elsewhere. Thin cover (under 2.5-6.5 m) lets the day through; the
 				// deeper the darker.
-				const float Snow = LcSm(0.45f, 0.75f, Nrm.Z);
+				// A crag's outside, out in the weather away from the cave's air, is old ice plastered with snow and rime,
+				// the blue showing through in places; the clean blue is the arch's inside and the cave's (round 13: the
+				// mouths were blue jelly on the snow).
+				const float Weather = LcSm(60.f, 220.f, AirHere) * LcSm(20.f, 120.f, -GroundTerm) * (0.6f + 0.35f * LcSm(-0.5f, 0.5f, LcN3(P / 160.f + FVector(3.f, 1.f, 5.f))));
+				const float Snow = FMath::Max(LcSm(0.45f, 0.75f, Nrm.Z), Weather);
 				const FLinearColor SnowC = FMath::Lerp(LcLin(214, 226, 238), LcLin(190, 206, 224), LcSm(-0.3f, 0.5f, LcN3(P / 120.f)));
 				Rc = FMath::Lerp(SnowC, C, Lip);
 				RRough = FMath::Lerp(0.8f, 1.f - C.A, Lip);
@@ -627,8 +634,13 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 				const FVector P = Verts[V] + ActorLoc;
 				const FVector2D M = L->ToMap(P);
 				const float Zm = float(P.Z) / 100.f;
-				// (The tangent runs along U as projected: the ground's normal map lit the right way round.)
-				Own.Add(Copy(V, Proj == 0 ? M / 4.f : Proj == 1 ? FVector2D(M.Y, Zm) / 4.f : FVector2D(M.X, Zm) / 4.f, Proj == 1 ? FVector(0.f, 1.f, 0.f) : FVector(1.f, 0.f, 0.f)));
+				// (The tangent runs along U as projected: the ground's normal map lit the right way round.) Where the land
+				// keeps its shore's wetness in the first UV's X (WRLand HfWet, M_IslandGround: the round island), the lip
+				// keeps it there too: given map metres, every lip east of the island's middle drew as wet ground (dark and
+				// glossy), a grey square on the snow in front of each Tundra mouth (round 13).
+				const float Wet = L->HfWet(FMath::RoundToInt((M.X - L->HfOrigin.X) / L->HfStep), FMath::RoundToInt((M.Y - L->HfOrigin.Y) / L->HfStep));
+				const FVector2D U = Wet >= 0.f ? FVector2D(Wet, 0.f) : Proj == 0 ? M / 4.f : Proj == 1 ? FVector2D(M.Y, Zm) / 4.f : FVector2D(M.X, Zm) / 4.f;
+				Own.Add(Copy(V, U, Proj == 1 ? FVector(0.f, 1.f, 0.f) : FVector(1.f, 0.f, 0.f)));
 			}
 		}
 		Lip = MoveTemp(Own);
