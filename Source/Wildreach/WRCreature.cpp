@@ -4039,7 +4039,22 @@ void AWRCreatureSpawner::SpawnOne()
 {
 	// A big herd spreads wider.
 	const float Spread = bRoams ? Radius * FMath::Sqrt(FMath::Max(Count, 3) / 3.f) : Radius;
-	const FVector2D Offset = FMath::RandPointInCircle(Spread);
+	FVector2D Offset = FMath::RandPointInCircle(Spread);
+	// The best of a few tries: the one farthest from the pack's others, enough when it clears their bodies (round 14:
+	// five mammoths came out of a den inside each other).
+	if (const FWRCreatureDef* Def = FWRCreatureRegistry::Get().Find(CreatureId))
+	{
+		const FVector2D Here(GetActorLocation());
+		float BestGap = -1.f;
+		for (int32 t = 0; t < 10; ++t)
+		{
+			const FVector2D Try = t == 0 ? Offset : FMath::RandPointInCircle(Spread);
+			float Gap = TNumericLimits<float>::Max();
+			for (const TWeakObjectPtr<AWRCreature>& A : Alive) if (A.IsValid()) Gap = FMath::Min(Gap, float(FVector2D::Distance(FVector2D(A->GetActorLocation()), Here + Try)));
+			if (Gap > BestGap) { BestGap = Gap; Offset = Try; }
+			if (Gap > Def->Radius * 2.8f) break;
+		}
+	}
 	bool bGround = false;
 	const FVector Ground = GroundAt(GetActorLocation() + FVector(Offset, 0.f), bGround);
 	if (!bGround && bRoams && GroundWaits < 10)

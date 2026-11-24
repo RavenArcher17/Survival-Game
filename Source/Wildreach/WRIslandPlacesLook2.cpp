@@ -7,6 +7,8 @@
 #include "WRTuning.h"
 #include "WRWorldDressing.h"
 #include "WRGroundTrail.h"
+#include "WRLand.h"
+#include "Wildreach.h"
 #include "Components/BoxComponent.h"
 #include "Components/StaticMeshComponent.h"
 #include "Dom/JsonObject.h"
@@ -121,32 +123,61 @@ namespace WRIsleT
 	/** A dead pine: a tapered pale trunk, branch stubs angled down, the top snapped on some (lying at its foot). */
 	void DeadPine(FWRIsleSite& S, const FPal& P, const FVector& G, float H, int32 Salt, bool bGnawed)
 	{
-		const bool bSnapped = S.R(G, Salt) < 0.35f;
-		const float Top = bSnapped ? H * 0.65f : H;
-		const FVector Lean(0.03f * S.J(G, Salt + 1), 0.03f * S.J(G, Salt + 2), 1.f);
-		FVector Prev = G - FVector(0, 0, 30.f);
-		for (int32 k = 1; k <= 5; ++k)
+		// (round 14: five straight rods with pencil-thin stubs read as a ring of telephone poles) A pine snag: a trunk that
+		// bends a little as it climbs and tapers hard, its roots flared into the snow, thick broken-off branch stubs up it,
+		// a few long dead limbs still hanging on, the top snapped into a splintered spike; leaning, a few of them hard.
+		const bool bSnapped = S.R(G, Salt) < 0.5f;
+		const float Top = bSnapped ? H * (0.55f + 0.2f * S.R(G, Salt + 9)) : H;
+		const float LeanAmt = (S.R(G, Salt + 5) < 0.3f ? 0.14f : 0.045f) * (0.5f + S.R(G, Salt + 6));
+		const FVector LeanDir = FRotator(0.f, 360.f * S.R(G, Salt + 7), 0.f).Vector();
+		const FVector Bow(S.J(G, Salt + 11), S.J(G, Salt + 12), 0.f);
+		const float Girth = 0.8f + 0.45f * S.R(G, Salt + 8);
+		const float R0 = 34.f * Girth * (H / 1200.f + 0.45f);
+		const auto TrunkAt = [&](float T) { return G + FVector(0.f, 0.f, Top * T) + LeanDir * (Top * T * LeanAmt) + Bow * (70.f * FMath::Sin(PI * T * 1.3f)); };
+		const auto RadAt = [&](float T) { return R0 * FMath::Lerp(1.f, 0.2f, FMath::Pow(T, 0.75f)); };
+		FVector Prev = G - FVector(0, 0, 40.f);
+		for (int32 k = 1; k <= 8; ++k)
 		{
-			const FVector Pt = G + Lean.GetSafeNormal() * Top * (k / 5.f);
-			S.K.Rod(P.PaleWood.Dim(0.78f + 0.08f * k), Prev, Pt, FMath::Lerp(56.f, 16.f, k / 5.f) * (H / 1200.f + 0.3f));
+			const float T = k / 8.f;
+			const FVector Pt = TrunkAt(T);
+			S.K.Rod(P.PaleWood.Dim(0.72f + 0.035f * k), Prev, Pt, RadAt(T - 0.0625f) * (k == 1 ? 1.15f : 1.f));
 			Prev = Pt;
 		}
-		for (int32 b = 0; b < 9; ++b)
 		{
-			const float Z = Top * (0.25f + 0.08f * b);
-			if (Z > Top - 40.f) break;
-			const FVector D = FRotator(0.f, 137.f * b + 360.f * S.R(G, Salt + 3), 0.f).Vector();
-			const FVector At = G + Lean.GetSafeNormal() * Z;
-			S.K.Rod(P.PaleWood.Dim(0.7f), At, At + D * (120.f - 9.f * b) - FVector(0, 0, 40.f), 8.f);
+			// the top: a splintered spike where it snapped, or the leader's last thin stick
+			const FVector T0 = TrunkAt(1.f);
+			const FVector Tip = T0 + FVector(30.f * S.J(G, Salt + 13), 30.f * S.J(G, Salt + 14), bSnapped ? 70.f : 160.f);
+			S.K.Rod(P.PaleWood.Dim(0.68f), T0, Tip, RadAt(1.f) * (bSnapped ? 0.6f : 0.4f));
+			if (bSnapped) S.K.Rod(P.PaleWood.Dim(0.6f), T0, T0 + FVector(-20.f * S.J(G, Salt + 14), 25.f * S.J(G, Salt + 13), 110.f), RadAt(1.f) * 0.35f);
 		}
-		if (bGnawed) for (int32 g = 0; g < 3; ++g) S.K.Add(P.WoodDark, FVector(10.f, 30.f, 50.f), G + FVector(20.f, 10.f * g, 80.f + 30.f * g), FRotator(0.f, 30.f * g, 0.f));
+		// the root flare
+		for (int32 r = 0; r < 4; ++r)
+		{
+			const FVector D = FRotator(0.f, 90.f * r + 30.f * S.J(G, Salt + 20 + r), 0.f).Vector();
+			S.K.Rod(P.PaleWood.Dim(0.66f), G + FVector(0, 0, 70.f) + D * (R0 * 0.3f), G + D * (R0 * 2.7f) - FVector(0, 0, 35.f), R0 * 0.4f);
+		}
+		// branch stubs in loose whorls, a few long limbs still on below the middle, drooping
+		for (int32 b = 0; b < 16; ++b)
+		{
+			const float T = 0.16f + 0.052f * b + 0.02f * S.J(G, Salt + 30 + b);
+			if (T * Top > Top - 70.f) break;
+			const FVector D = FRotator(0.f, 137.5f * b + 360.f * S.R(G, Salt + 3), 0.f).Vector();
+			const FVector At = TrunkAt(T);
+			const bool bLimb = (b % 5 == 2) && T < 0.65f;
+			const float Len = bLimb ? 240.f + 120.f * S.R(G, Salt + 50 + b) : 45.f + 70.f * S.R(G, Salt + 50 + b);
+			const FVector End = At + D * Len + FVector(0, 0, bLimb ? -70.f : 20.f + 25.f * S.R(G, Salt + 70 + b));
+			S.K.Rod(P.PaleWood.Dim(0.64f), At, End, bLimb ? 9.f * Girth : (8.f + 5.f * S.R(G, Salt + 90 + b)) * Girth);
+			if (bLimb) S.K.Rod(P.PaleWood.Dim(0.6f), End, End + D * 90.f + FVector(40.f * S.J(G, Salt + 110 + b), 0.f, -50.f), 4.5f * Girth);
+		}
+		if (bGnawed) for (int32 g = 0; g < 3; ++g) S.K.Add(P.WoodDark, FVector(10.f, 30.f, 50.f), G + FVector(R0 * 0.85f, 10.f * g, 80.f + 30.f * g), FRotator(0.f, 30.f * g, 0.f));
 		if (bSnapped)
 		{
+			// the fallen top lying in the snow beside it
 			const FVector D = FRotator(0.f, 360.f * S.R(G, Salt + 4), 0.f).Vector();
-			const FVector A = G + D * 200.f, B = G + D * (200.f + H * 0.35f);
-			S.K.Rod(P.PaleWood.Dim(0.7f), FVector(A.X, A.Y, S.Gz(A.X, A.Y) + 12.f), FVector(B.X, B.Y, S.Gz(B.X, B.Y) + 8.f), 20.f);
+			const FVector A = G + D * 220.f, B = G + D * (220.f + H * 0.35f);
+			S.K.Rod(P.PaleWood.Dim(0.68f), FVector(A.X, A.Y, S.Gz(A.X, A.Y) + 14.f), FVector(B.X, B.Y, S.Gz(B.X, B.Y) + 8.f), RadAt(0.6f));
 		}
-		S.Solid(G + FVector(0, 0, Top * 0.5f), FVector(22.f, 22.f, Top * 0.5f));
+		S.Solid(G + FVector(0, 0, Top * 0.5f), FVector(R0 * 0.6f, R0 * 0.6f, Top * 0.5f));
 	}
 
 	// ======================================================================================================= landmarks
@@ -292,13 +323,15 @@ namespace WRIsleT
 		// foot. Six drop points in front are the serac-fall hazard.
 		// A ragged, fused wall (11-22: eleven towers of one size in an even row read as totems): seventeen towers set close
 		// and out of line, of every height, leaning out over the bowl, a lower mass of ice fused behind them.
+		// (round 14: still a palisade of slim prisms; now broad chunks shouldering into each other, lower, the tallest
+		// toward the middle; seeded a metre apart: whole indices all fell in one 5 cm cell of the kit's hash)
 		for (int32 i = 0; i < 17; ++i)
 		{
-			const FVector Seed(i, 3, 0);
+			const FVector Seed(i * 100.f, 300.f, 0.f);
 			const float Y = -2600.f + 325.f * i + 110.f * S.J(Seed, 1);
-			const float X = -300.f + 200.f * S.J(Seed, 8) - (i % 3 == 1 ? 180.f : 0.f);
-			const float W = 300.f + 220.f * S.R(Seed, 2), D = 300.f + 160.f * S.R(Seed, 3);
-			const float H = 450.f + 1150.f * FMath::Pow(S.R(Seed, 4), 0.8f) * (0.55f + 0.45f * FMath::Sin(PI * (i + 0.5f) / 17.f));
+			const float X = -300.f + 260.f * S.J(Seed, 8) - (i % 3 == 1 ? 220.f : 0.f);
+			const float W = 440.f + 260.f * S.R(Seed, 2), D = 400.f + 220.f * S.R(Seed, 3);
+			const float H = 420.f + 820.f * FMath::Pow(S.R(Seed, 4), 0.8f) * (0.5f + 0.5f * FMath::Sin(PI * (i + 0.5f) / 17.f));
 			const float Lean = 4.f + 8.f * S.R(Seed, 5);
 			const FVector C(X, Y, S.Gz(X, Y) + H * 0.5f - 60.f);
 			const FRotator Rot(-Lean, 25.f * S.J(Seed, 6), 5.f * S.J(Seed, 7));
@@ -312,13 +345,13 @@ namespace WRIsleT
 		}
 		for (int32 i = 0; i < 7; ++i)
 		{
-			const FVector Seed(i, 9, 0);
+			const FVector Seed(i * 100.f, 900.f, 0.f);
 			const float Y = -2700.f + 900.f * i + 150.f * S.J(Seed, 1), X = -800.f + 120.f * S.J(Seed, 2);
 			S.Ice(40 + i, FVector(800.f + 300.f * S.R(Seed, 3), 950.f + 250.f * S.R(Seed, 4), 380.f + 260.f * S.R(Seed, 5)), FVector(X, Y, S.Gz(X, Y)), FRotator(-3.f, 90.f + 15.f * S.J(Seed, 6), 0.f), false, 80.f, 0.6f);
 		}
 		for (int32 k = 0; k < 10; ++k)
 		{
-			const FVector At(150.f + 300.f * S.R(FVector(k), 8), -2300.f + 480.f * k, 0.f);
+			const FVector At(150.f + 300.f * S.R(FVector(k * 100.f), 8), -2300.f + 480.f * k, 0.f);
 			S.Ice(k + 1, FVector(160.f + 120.f * S.R(At, 9), 140.f + 100.f * S.R(At, 10), 120.f + 90.f * S.R(At, 11)), FVector(At.X, At.Y, S.Gz(At.X, At.Y)), FRotator(20.f * S.J(At, 12), 360.f * S.R(At, 13), 15.f * S.J(At, 14)), true, 20.f);
 		}
 		S.Lamp(FVector(-100.f, 0.f, S.Gz(-100.f, 0.f) + 300.f), Lin(110, 180, 240), 2000.f, 2000.f);
@@ -374,8 +407,8 @@ namespace WRIsleT
 		// down. No light at all here: its threat is the dark.
 		for (int32 i = 0; i < 18; ++i)
 		{
-			const float A = 20.f * i + 9.f * S.J(FVector(i), 1);
-			const float R = 3300.f + 2400.f * S.R(FVector(i), 2);
+			const float A = 20.f * i + 9.f * S.J(FVector(i * 100.f), 1);
+			const float R = 3300.f + 2400.f * S.R(FVector(i * 100.f), 2);
 			const FVector G(FMath::Cos(FMath::DegreesToRadians(A)) * R, FMath::Sin(FMath::DegreesToRadians(A)) * R, 0.f);
 			DeadPine(S, P, FVector(G.X, G.Y, S.Gz(G.X, G.Y)), 900.f + 500.f * S.R(G, 3), 10 + i, i % 3 == 0);
 		}
@@ -723,97 +756,54 @@ namespace WRIsleT
 
 	void CrevasseMaze(FWRIsleSite& S, const FPal& P)
 	{
-		// Rows of glacier ice with crevasses 4.4 m wide between them (too far to jump), crossed by bridges. The Rime-folk's
-		// safe line runs along column 1: its crossings are old ice bridges that hold, marked by willow poles with red rags.
-		// Everywhere else the crossings are snow bridges: one creaks and drops 0.9 s after the first step (keep running and
-		// you're over; stop and you fall into the crevasse, and walk out along its floor). The outer rows rise out of the
-		// glacier as snow slopes you walk up; each row's ends run down into it as snow tails, the crevasses pinching out.
-		// (Round 12, Raven: "The maze looks like shit". It was separate cubes, a pile of dice from the air; then one level
-		// slab per row on ground falling 1 m in 2.4, 15 m tall at its foot. Now the field lies on the slope's own plane,
-		// the rows running down it, so each row is level across and the bridges between them are too: rows of fluted ice,
-		// battered out with depth, snow on their crowned tops (SM_CrevasseRow, Tools/art/make_meshes.py crevasse_row),
-		// arched snow and ice bridges (snow_bridge).)
-		const int32 Rows = 6, Cols = 5;
-		const float PitchX = 840.f, PitchY = 520.f, Block = 400.f, X0 = -2100.f, Y0 = -1040.f;
-		const int32 Safe = 1;
+		// Five crevasses 4.4 m wide and 4.5 m deep (too far to jump), running down the glacier's slope 8.4 m apart, crossed
+		// by bridges. The Rime-folk's safe line runs along column 1: its crossings are old ice bridges that hold, marked by
+		// willow poles with red rags. Everywhere else the crossings are snow bridges: one creaks and drops 0.9 s after the
+		// first step (keep running and you're over; stop and you fall into the crevasse, and walk out along its floor, which
+		// climbs to the surface at each end).
+		// (Round 12, Raven: "The maze looks like shit": it was separate cubes, a pile of dice from the air; then rows of
+		// fluted ice stood on a plane fitted to the slope, from the air a raised slab whose edge stepped along the 4 m
+		// ground. Round 14: the crevasses are cut into the glacier itself (round_ground.mjs "crevasses", drawn by
+		// WRLandCaves as the caves' mouths are: their ice walls, the ground's own snow over the rims); the glacier between
+		// them is the ground. Here: the bridges, the poles, ice fallen in, the seracs round the field.)
+		const FWRLandDef* L = WRLand::At(S.World.GetLocation());
+		const FWRLandCrevasses* Field = nullptr;
+		if (L) for (const FWRLandCrevasses& F : L->Crevasses) if (F.Id == TEXT("crevasse_maze")) { Field = &F; break; }
+		if (!Field || Field->Slots.Num() == 0)
+		{
+			UE_LOG(LogWildreach, Warning, TEXT("ISLE PLACES crevasse maze: no crevasses in the land (round_ground.mjs)"));
+			return;
+		}
+		// The field's frame in the place's: U across the crevasses, V down them; its middle.
+		const FVector U = S.World.InverseTransformVectorNoScale(FVector(Field->U, 0.f)).GetSafeNormal2D();
+		const FVector V = S.World.InverseTransformVectorNoScale(FVector(Field->V, 0.f)).GetSafeNormal2D();
+		const FVector Mid = S.Local(L->ToWorld(Field->At, 0.f)) * FVector(1.f, 1.f, 0.f);
+		const auto At2 = [&](float Ux, float Vy) { const FVector Q = Mid + U * Ux + V * Vy; return FVector(Q.X, Q.Y, S.Gz(Q.X, Q.Y)); };
+		const float YawU = FMath::RadiansToDegrees(FMath::Atan2(U.Y, U.X));
+		const int32 Cols = 5, Safe = 1;
+		const float PitchY = 520.f, Y0 = -1040.f;
 		const auto YAt = [&](int32 c) { return Y0 + PitchY * c; };
-		// Seeded 0..1 / -1..1 for a row, a column, a piece (the kit hashes 5 cm cells of a place: indices a metre apart;
-		// round 12 fed it row numbers, so every row drew the same and the decoys all fell on one column).
+		// Seeded 0..1 / -1..1 for a crevasse, a column, a piece (the kit hashes 5 cm cells of a place: indices a metre apart).
 		const auto Rn = [&](int32 A, int32 B, int32 C, int32 Salt) { return S.R(FVector(A * 100.f, B * 100.f, C * 100.f), Salt); };
 		const auto Jn = [&](int32 A, int32 B, int32 C, int32 Salt) { return S.J(FVector(A * 100.f, B * 100.f, C * 100.f), Salt); };
-		// The ground's plane under the field (least squares over 60 x 50 m; the grid is centred, so it parts by axis).
-		double Sxx = 0.0, Syy = 0.0, Sz = 0.0, Sxz = 0.0, Syz = 0.0;
-		int32 Nn = 0;
-		for (int32 i = 0; i <= 8; ++i)
-			for (int32 j = 0; j <= 8; ++j)
-			{
-				const float X = -3000.f + 750.f * i, Y = -2500.f + 625.f * j, Z = S.Gz(X, Y);
-				Sxx += X * X; Syy += Y * Y; Sz += Z; Sxz += X * Z; Syz += Y * Z; ++Nn;
-			}
-		const float Gx = float(Sxz / Sxx), Gy = float(Syz / Syy), C0 = float(Sz / Nn);
-		// The rows (the field's Y) run down the slope, turned as little as can be from the place's own frame; on near flat
-		// ground they keep it.
-		float Yaw = 0.f;
-		if (FMath::Sqrt(Gx * Gx + Gy * Gy) > 0.04f)
+		const int32 NSlots = Field->Slots.Num();
+		TArray<float> SlotU;
+		for (const FWRLandCrevasses::FSlot& Sl : Field->Slots) SlotU.Add(float(FVector2D::DotProduct(Sl.C - Field->At, Field->U)) * 100.f);
+		// The safe line's willow poles: on the ice between the crevasses (and beyond the outer two), beside its crossings.
+		for (int32 r = 0; r <= NSlots; ++r)
 		{
-			Yaw = FMath::RadiansToDegrees(FMath::Atan2(Gx, -Gy));
-			if (Yaw > 90.f) Yaw -= 180.f;
-			else if (Yaw < -90.f) Yaw += 180.f;
-		}
-		const float YawR = FMath::DegreesToRadians(Yaw);
-		const float SlopeY = -Gx * FMath::Sin(YawR) + Gy * FMath::Cos(YawR);
-		const float Tilt = FMath::Atan(SlopeY), CosT = FMath::Cos(Tilt);
-		const FQuat QF = FQuat(FVector::UpVector, YawR) * FQuat(FVector::ForwardVector, Tilt);
-		const FRotator RF = QF.Rotator();
-		const FVector Origin(0.f, 0.f, C0);
-		// the field's frame -> the place's
-		const auto F = [&](float X, float Y, float Z) { return Origin + QF.RotateVector(FVector(X, Y, Z)); };
-		// The ground's height off the plane (in the field's frame) under a field point.
-		const auto Off = [&](float X, float Y) { const FVector P0 = F(X, Y, 0.f); return (S.Gz(P0.X, P0.Y) - P0.Z) * CosT; };
-		// The field's foot: the ground's mean off the plane under its rows. The rows run 41 m, 4 m tall; past the
-		// crevasses' ends they spread and join, falling away as one slope (one mesh per row, the surface there the
-		// field's own: rows of their own heights met in seams down it).
-		const float RowHalf = 2050.f;
-		float Base[Rows], Ht[Rows], Xr[Rows], Wr[Rows];
-		float BaseAll = 0.f;
-		for (int32 r = 0; r < Rows; ++r)
-		{
-			const float X = X0 + PitchX * r;
-			float Sum = 0.f;
-			int32 Ns = 0;
-			for (int32 k = 0; k <= 10; ++k)
-				for (const float Dx : { -Block * 0.5f, 0.f, Block * 0.5f }) { Sum += Off(X + Dx, -RowHalf + RowHalf * 0.2f * k); ++Ns; }
-			BaseAll += Sum / Ns / Rows;
-			Ht[r] = 400.f;
-			Xr[r] = X0 + PitchX * r;
-			Wr[r] = Block;
-		}
-		for (int32 r = 0; r < Rows; ++r) Base[r] = BaseAll;
-		// a row's top at its lips (the crown is 16 cm higher at its middle, ~10 cm 80 cm in from a lip)
-		const auto TopF = [&](int32 r) { return Base[r] + Ht[r]; };
-		for (int32 r = 0; r < Rows; ++r)
-		{
-			const float X = Xr[r];
-			const FString Mesh = FString::Printf(TEXT("/Game/Art/Gen/SM_CrevasseRow_%d.SM_CrevasseRow_%d"), r, r);
-			// (the mesh collides as it's drawn: its tops, its tails and the outer rows' slopes are walked on)
-			// (Snow 0.15: its tops white under the wind's breakup, the walls blue)
-			if (!S.Shape(*Mesh, F(X, 0.f, Base[r]), RF, FVector(Wr[r] / 400.f, 1.f, Ht[r] / 400.f), true, false, FLinearColor::White, 0.15f))
-			{
-				const FVector Half(Wr[r] * 0.5f, RowHalf, (Ht[r] + 150.f) * 0.5f);
-				S.Solid(F(X, 0.f, Base[r] + Ht[r] - Half.Z), Half, RF);
-			}
-			// the safe line's willow pole on each row, stood upright in the snow on its top
-			const FVector Pole = F(X + Wr[r] * 0.3f, YAt(Safe) + Block * 0.35f, TopF(r) + 10.f * Ht[r] / 400.f);
+			const float Ux = r == 0 ? SlotU[0] - 420.f : r == NSlots ? SlotU[NSlots - 1] + 420.f : (SlotU[r - 1] + SlotU[r]) * 0.5f;
+			const FVector Pole = At2(Ux + 120.f, YAt(Safe) + 140.f);
 			S.K.Rod(P.Willow, Pole - FVector(0, 0, 25.f), Pole + FVector(0, 0, 210.f), 5.f);
-			S.K.Add(P.Red, FVector(4.f, 24.f, 40.f), Pole + FVector(4.f, 12.f, 190.f), FRotator(0.f, Yaw, 10.f));
+			S.K.Add(P.Red, FVector(4.f, 24.f, 40.f), Pole + FVector(4.f, 12.f, 190.f), FRotator(0.f, YawU + 90.f, 10.f));
 		}
-		for (int32 r = 0; r + 1 < Rows; ++r)
+		static const TCHAR* Chunks[3] = { TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C") };
+		for (int32 r = 0; r < NSlots; ++r)
 		{
-			const float Xm = (Xr[r] + Wr[r] * 0.5f + Xr[r + 1] - Wr[r + 1] * 0.5f) * 0.5f;
+			const FWRLandCrevasses::FSlot& Sl = Field->Slots[r];
+			const float Reach = Sl.HalfW * 100.f + 80.f;   // a bridge's ends rest 80 cm past each lip
 			// The crossings: the safe line's ice bridge, and snow bridges (two on every other crevasse, one between), each
-			// at its own place along it: none line up across the field but the safe line's (16 on a grid read as a lattice
-			// from the air). A bridge's ends lie on the two rows' tops 80 cm in from their lips (a few cm into the snow),
-			// pitched between them.
+			// at its own place along it: none line up across the field but the safe line's.
 			static const int32 Others[4] = { 0, 2, 3, 4 };
 			const int32 Da = FMath::Min(3, int32(4.f * Rn(r, 0, 92, 93)));
 			const int32 Decoy0 = Others[Da];
@@ -822,12 +812,12 @@ namespace WRIsleT
 			{
 				const bool bSafe = c == Safe;
 				if (!bSafe && c != Decoy0 && c != Decoy1) continue;
-				const float Ea = TopF(r) + 6.f, Eb = TopF(r + 1) + 6.f;
-				const float Pitch = FMath::Atan((Eb - Ea) / 600.f);
-				const FQuat QB = QF * FQuat(FVector::RightVector, -Pitch);
-				// (the snow bridges each a little off the column's line, as they fell; the safe line straight between its poles)
 				const float Yb = YAt(c) + (bSafe ? 0.f : 120.f * Jn(r, c, 90, 91));
-				const FVector At = F(Xm, Yb, (Ea + Eb) * 0.5f);
+				const FVector Ea = At2(SlotU[r] - Reach, Yb) + FVector(0, 0, 6.f), Eb = At2(SlotU[r] + Reach, Yb) + FVector(0, 0, 6.f);
+				const FVector At = (Ea + Eb) * 0.5f;
+				const float Pitch = FMath::RadiansToDegrees(FMath::Atan2(Eb.Z - Ea.Z, FVector::Dist2D(Ea, Eb)));
+				// (the bridge's own X runs across the crevasse; pitched to its two lips)
+				const FQuat QB = FRotator(Pitch, YawU, 0.f).Quaternion();
 				const FVector Half(300.f, bSafe ? 145.f : 118.f, 25.f);   // (a snow bridge's narrow middle)
 				const FVector BoxAt = At + QB.RotateVector(FVector(0.f, 0.f, -Half.Z - 4.f));
 				const TCHAR* Mesh = bSafe ? TEXT("/Game/Art/Gen/SM_IceBridge_A.SM_IceBridge_A") : (c + r) % 4 == 0 ? TEXT("/Game/Art/Gen/SM_SnowBridge_A.SM_SnowBridge_A") : TEXT("/Game/Art/Gen/SM_SnowBridge_B.SM_SnowBridge_B");
@@ -844,46 +834,24 @@ namespace WRIsleT
 				if (Look) H2.Whole.Add(Look);
 				H2.Solid.Add(S.Solid(BoxAt, Half, QB.Rotator()));
 			}
-			// Each end of the crevasse filled by a drift, a ramp up to the rows' tops (Tools/art/make_meshes.py
-			// crevasse_fill; it collides: you climb out up it). Sized to the gap and the lower row's top.
-			{
-				const float Gap = (Xr[r + 1] - Wr[r + 1] * 0.5f) - (Xr[r] + Wr[r] * 0.5f);
-				const float Bf = (Base[r] + Base[r + 1]) * 0.5f, Hf = FMath::Min(TopF(r), TopF(r + 1)) - Bf;
-				for (const float Sd : { -1.f, 1.f })
-				{
-					const FQuat QE = Sd > 0.f ? QF : QF * FQuat(FVector::UpVector, PI);
-					if (!S.Shape(TEXT("/Game/Art/Gen/SM_CrevasseFill_A.SM_CrevasseFill_A"), F(Xm, Sd * RowHalf, Bf), QE.Rotator(), FVector((Gap + 40.f) / 480.f, 1.f, Hf / 400.f), true, false, FLinearColor::White, 1.f))
-						S.Solid(F(Xm, Sd * (RowHalf - 400.f), Bf + Hf * 0.25f), FVector(Gap * 0.5f, 400.f, Hf * 0.25f), (QE * FQuat(FVector::ForwardVector, Sd * FMath::Atan(Hf / 800.f))).Rotator());
-				}
-			}
-			// The crevasse's floor: dark old ice under the snow that fell in, laid along the ground in eight pieces, and a
-			// few blocks of ice broken off the walls.
-			for (int32 k = 0; k < 8; ++k)
-			{
-				const float Y = -1890.f + 540.f * k;
-				const FVector G0 = F(Xm, Y, 0.f);
-				S.K.Add(P.DeepIce.Dim(0.3f), FVector(300.f, 540.f, 24.f), FVector(G0.X, G0.Y, S.Gz(G0.X, G0.Y) + 2.f), RF);
-			}
-			static const TCHAR* Chunks[3] = { TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C") };
+			// A few blocks of ice broken off the walls, lying on the crevasse's floor.
 			for (int32 k = 0; k < 2; ++k)
 			{
-				const float Y = -1500.f + 3000.f * Rn(r, k, 70, 71);
-				const FVector G0 = F(Xm + 60.f * Jn(r, k, 72, 73), Y, 0.f);
+				const float Y = (-0.75f + 1.5f * Rn(r, k, 70, 71)) * Sl.HalfLen * 100.f;
+				const FVector G0 = At2(SlotU[r] + 70.f * Jn(r, k, 72, 73), Y);
 				const float Sc = 0.22f + 0.14f * Rn(r, k, 74, 75);
-				S.Shape(Chunks[(r + k) % 3], FVector(G0.X, G0.Y, S.Gz(G0.X, G0.Y) - 30.f), FRotator(25.f * Jn(r, k, 76, 77), 360.f * Rn(r, k, 78, 79), 30.f * Jn(r, k, 80, 81)), FVector(Sc), false, false, FLinearColor::White, 0.f);
+				S.Shape(Chunks[(r + k) % 3], FVector(G0.X, G0.Y, G0.Z - Sl.Depth * 100.f - 20.f), FRotator(25.f * Jn(r, k, 76, 77), 360.f * Rn(r, k, 78, 79), 30.f * Jn(r, k, 80, 81)), FVector(Sc), false, false, FLinearColor::White, 0.f);
 			}
 		}
-		// Round the field the glacier breaks into a few seracs, most below it (down the slope), one or two off its sides
-		// beyond the slopes up to it.
+		// Round the field the glacier breaks into a few seracs, most below it (down the slope), one or two off its sides.
 		static const TCHAR* Seracs[4] = { TEXT("/Game/Art/Gen/SM_Serac_A.SM_Serac_A"), TEXT("/Game/Art/Gen/SM_Serac_B.SM_Serac_B"), TEXT("/Game/Art/Gen/SM_Serac_C.SM_Serac_C"), TEXT("/Game/Art/Gen/SM_Serac_D.SM_Serac_D") };
-		const FVector2D SeracAt[6] = { { -1800.f, 5300.f }, { 700.f, 5900.f }, { 2900.f, 5200.f }, { -5300.f, -900.f }, { 5300.f, 1400.f }, { 400.f, -5600.f } };
+		const FVector2D SeracAt[6] = { { -1800.f, 4300.f }, { 700.f, 4700.f }, { 2900.f, 4200.f }, { -3300.f, -900.f }, { 3300.f, 1400.f }, { 400.f, -4500.f } };
 		for (int32 i = 0; i < 6; ++i)
 		{
-			const FVector A = F(SeracAt[i].X + 150.f * Jn(i, 0, 60, 61), SeracAt[i].Y + 150.f * Jn(i, 0, 62, 63), 0.f);
-			const float Sc = 0.45f + 0.3f * Rn(i, 0, 64, 65);
-			const float G = S.Gz(A.X, A.Y);
-			S.Shape(Seracs[i % 4], FVector(A.X, A.Y, G - 60.f), FRotator(0.f, 360.f * Rn(i, 0, 66, 67), 0.f), FVector(Sc), false, false, FLinearColor::White, 0.75f);
-			S.Solid(FVector(A.X, A.Y, G + 300.f * Sc), FVector(170.f * Sc, 120.f * Sc, 330.f * Sc));
+			const FVector A = At2(SeracAt[i].X + 150.f * Jn(i, 0, 60, 61), SeracAt[i].Y + 150.f * Jn(i, 0, 62, 63));
+			const float Sc = 0.6f + 0.35f * Rn(i, 0, 64, 65);
+			S.Shape(Seracs[i % 4], FVector(A.X, A.Y, A.Z - 60.f), FRotator(0.f, 360.f * Rn(i, 0, 66, 67), 0.f), FVector(Sc), false, false, FLinearColor::White, 0.75f);
+			S.Solid(FVector(A.X, A.Y, A.Z + 260.f * Sc), FVector(200.f * Sc, 160.f * Sc, 280.f * Sc));
 		}
 	}
 

@@ -119,6 +119,18 @@ struct WILDREACH_API FWRLandCaveLight
 	bool bDay = false;
 };
 
+/** A field of open crevasses cut into a heightfield land's glacier (land file "crevasses", round 14: the Crevasse Maze):
+ *  its frame (U across, V down the slope, map units) and its slots, each a trench down V: its middle (map m), half length,
+ *  half width and depth (m) and the ramp its floor climbs to the surface at each end (m). WRLandCaves draws them as the
+ *  caves' rock (their ice walls, the ground's lip over them); the maze's builder lays its bridges across them. */
+struct WILDREACH_API FWRLandCrevasses
+{
+	FName Id;
+	FVector2D At = FVector2D::ZeroVector, U = FVector2D(1.f, 0.f), V = FVector2D(0.f, 1.f);
+	struct FSlot { FVector2D C = FVector2D::ZeroVector; float HalfLen = 0.f, HalfW = 0.f, Depth = 0.f, Ramp = 0.f; };
+	TArray<FSlot> Slots;
+};
+
 /** An underground cave of a heightfield land (land file "caves"; Tools/terrain/cave_layout.mjs lays it, round_ground.mjs
  *  sites it and cuts the ground at its mouth and skylights): a small network of shapes joined smoothly (an entrance,
  *  chambers, passages, a crawl to a pocket, a squeeze, a ledge and its ramp, a skylight), its formations and lights,
@@ -253,6 +265,8 @@ struct WILDREACH_API FWRLandDef
 	TArray<FVector2D> BuildFirst;
 	/** Its underground caves (heightfield lands: the round island's). */
 	TArray<FWRLandCave> Caves;
+	/** Its open crevasse fields (the round island's Crevasse Maze). */
+	TArray<FWRLandCrevasses> Crevasses;
 	/** Where two lands both have ground at a point, the higher priority's is the ground there (the Graveyard's 1 over the
 	 *  forest's west face of the Spine). */
 	int32 Priority = 0;

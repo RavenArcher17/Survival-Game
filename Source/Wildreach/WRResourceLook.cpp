@@ -5,6 +5,7 @@
 #include "WRDesertTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
+#include "WRLand.h"
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -603,13 +604,18 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		const float BushH = 260.f, LeafH = BushH * 0.45f;
 		Place(Fit(Main, FVector(0.f, 0.f, BushH), 8.f));
 		Look->SetCastShadow(false);  // like the island's shrubs: wind-blown leaf cards in the shadow maps cost far more than they show
+		// In the Tundra frosted over, the berries showing red through it (round 14: a summer-green bush stood on the snow).
+		// (the zone's own biome: the round island is one land, its biome not the Tundra's)
+		const FWRLandDef* Land = WRLand::At(Node->GetActorLocation());
+		const bool bFrost = Land && Land->BiomeAtMap(Land->ToMap(Node->GetActorLocation())) == TEXT("tundra");
 		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
 		{
 			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
 			{
-				// No "snow" coat: a fresh green bush, the one green thing among the ashen shrubs, hung with berries.
-				MID->SetScalarParameterValue(TEXT("Amount Min"), 0.f);
-				MID->SetScalarParameterValue(TEXT("Amount Max"), 0.f);
+				// No "snow" coat elsewhere: a fresh green bush, the one green thing among the ashen shrubs, hung with berries.
+				MID->SetScalarParameterValue(TEXT("Amount Min"), bFrost ? 0.35f : 0.f);
+				MID->SetScalarParameterValue(TEXT("Amount Max"), bFrost ? 0.6f : 0.f);
+				if (bFrost) MID->SetVectorParameterValue(TEXT("Snow Color"), FLinearColor(0.9f, 0.94f, 1.f));
 				Look->SetMaterial(Slot, MID);
 			}
 		}

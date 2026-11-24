@@ -2,6 +2,58 @@
 
 ## Unreleased
 
+### Round island: the look pass, thirteenth round: the Tundra finished, the Volcanic's cliffs and ground (11-24)
+
+Raven: "Keep fixing everything you find until we can move onto the next biome". A fresh survey of the Tundra (35
+spots) and the Volcanic (34), and everything they turned up.
+- **Ice cliffs grow out of the land:** the ice shelves', the glacier's, the cirque's and the ice cap's faces were panels
+  of fluted ice stood along them. From the air they read as rows of striped slabs, on the cirque's terraces like
+  radiators, a lone one on a big wall like a door. Now the steep ice itself grows out of the land, built the way the
+  caves' mouths are (WRLandCaves): each face stands a metre or two proud of the ground in fluted ice, ribs top to
+  bottom, set back in steps, snow on its ledges, the glacier's strata faint in it and bluer down the runnels; its top
+  and foot roll back into the snow. The panels are gone.
+- **The Crevasse Maze is cut into the glacier:** rows of ice stood on a plane fitted to the slope, and from the air
+  the field was a raised slab whose edge stepped along the ground. The five crevasses are now cut into the glacier
+  itself (4.4 m wide, 4.5 m deep, ice walls, snow over their lips, their floors climbing out at both ends); the ice
+  between them is the ground. Bridges, the safe line's poles and the snow bridges' drop work as before. A bot crossed
+  the safe line over all five and walked a crevasse's floor out of both ends.
+- **Frozen lakes are black ice:** the lakes (and the Thaw's ponds) were matte grey, concrete. They're now clear ice:
+  dark and glossy, mirroring the sky and the shore, white cracks and bubbles in it. Skaldrith's cirque floor is
+  polished blue ice the same way.
+- **The Hollow Ice's hairlines:** two dark hairlines ran across the snow in front of its mouth, where the land's cut
+  edge stood over the cave's floor. The land now hangs a short skirt round every cut, and the cave's skin reaches
+  under the land's edge.
+- **Seracs:** slim leaning prisms in groups read as gravestones, and the Weeping Seracs as a palisade. Now chunks as
+  wide as they're tall, broken off in a step, a second block fused on, their tops lying on the break (not a
+  pinwheel of snowy facets); the Weeping Seracs broad, shouldering into each other, lower.
+- **The Pine Hollows' trees:** a red-trunked bonsai pine and a crumpled low-poly birch grew among the snowy spruces.
+  The Tundra now grows the snow-laden spruce and the dark fir; the kipuka keeps its green pines.
+- **The Snow Flats:** the wind-scoured rock patches were tan and blended through brown, burn marks from the air: now
+  grey stone. The frost cracks drew a blue-grey network over half the flats, a tiled floor: now narrower, fainter,
+  in fewer patches, and never across the rock.
+- **Old snow on the Steppe and the Thaw** thins and dirties at its rim instead of lying white to the edge.
+- **Mammoths** came out of a den inside each other: a den's pack spreads by the animal's size, and each animal comes
+  out clear of the others.
+- **The Pale Hunter's pines** were straight white rods with pencil stubs, a ring of telephone poles: now snags that
+  bend and taper, roots flared, thick broken stubs and a few long dead limbs, the tops splintered or fallen beside them.
+- **Berry bushes** in the Tundra are frosted over, the berries showing red through it.
+- **The Volcanic's cliffs:** rock panels laid close up every ridge, terrace and lava front read as brick walls. They're
+  gone; its steep ground draws layered rock, flows laid one on another, in the ground's own material. (Growing the
+  Volcanic's cliffs out of the land as the Tundra's ice is grown was tried: 10,000 more pieces of mesh and 12 GB more
+  memory on a client, for little on its dark ridges. It's there, off: landCaves.rockWalls.)
+- **The ash plains** read as beige sand from any height: now grey ash, grey stones in its texture.
+- **The Solfatara** was a quarter flat yellow, a desert: now bleached clay with yellow crusts in small patches.
+- **Cinder cones'** red scoria lay round each in a near circle, a disc of paint from the air: now ragged, in tongues
+  down its gullies, breaking up at its foot.
+- **The lava river's head** was cut straight across, a flat red triangle on the ash: it now wells out of its vent
+  narrow and spreads to its width over the first 60 m.
+- **The kipuka** grew the Tundra's snow-laden spruce: now its green pines, with an old gnarled one here and there.
+- **Memory:** the ice walls cost about 2.3 GB on a client and 1.6 GB on the server (measured in the editor's game);
+  each cube of cave or wall now keeps only the vertices it draws.
+- **Checked:** the round-island tests pass (0 failed; the city 17.3 ms a frame, the meadow 9.8 ms). The Tundra's
+  busiest spots hold the 60 fps cap with the walls. A bot walked the three Tundra caves (131 of 132 legs, as before),
+  crossed the maze's safe line and walked a crevasse's floor out of both ends.
+
 ### Round island: the look pass, twelfth round: the Tundra's cave mouths, worn ground, the fishing camp, two collars (11-24)
 
 The eleventh round's rough edges (Raven: "Keep going").

@@ -1050,16 +1050,32 @@ void AWRRoundIsland::BuildLava()
 	TArray<FVector2D> UV;
 	TArray<FLinearColor> Col;
 	TArray<FProcMeshTangent> Tan;
+	// (round 14: cut straight across at its head, the flow read as a flat red triangle on the ash from its vent; it now
+	// wells out of the vent narrow and spreads to its width over the first 60 m, its end rounded)
+	const float HeadSpread = T.Num(TEXT("roundIsland.lavaHeadSpread"), 6000.f);
+	// (a point a few metres back up its line, so the head's end closes round; then every 15 m, so the spread is smooth)
+	Pts.Insert(Pts[0] - (Pts[1] - Pts[0]).GetSafeNormal2D() * 300.f + FVector(0.f, 0.f, 20.f), 0);
+	{
+		TArray<FVector> Dense;
+		for (int32 i = 0; i + 1 < Pts.Num(); ++i)
+		{
+			const int32 Steps = FMath::Max(1, FMath::CeilToInt(FVector::Dist2D(Pts[i], Pts[i + 1]) / 1500.f));
+			for (int32 s = 0; s < Steps; ++s) Dense.Add(FMath::Lerp(Pts[i], Pts[i + 1], float(s) / Steps));
+		}
+		Dense.Add(Pts.Last());
+		Pts = MoveTemp(Dense);
+	}
 	float Along = 0.f;
 	for (int32 i = 0; i < Pts.Num(); ++i)
 	{
 		if (i) Along += FVector::Dist2D(Pts[i], Pts[i - 1]);
 		const FVector Dir = (Pts[FMath::Min(i + 1, Pts.Num() - 1)] - Pts[FMath::Max(i - 1, 0)]).GetSafeNormal2D();
 		const FVector Side(-Dir.Y, Dir.X, 0.f);
+		const float HalfHere = Half * FMath::Lerp(0.05f, 1.f, FMath::SmoothStep(0.f, HeadSpread, Along));
 		for (const float A : Across)
 		{
 			const bool bRim = FMath::Abs(A) > 0.9f;
-			V.Add(Pts[i] + Side * (A * Half) - FVector(0.f, 0.f, bRim ? 25.f : 0.f));
+			V.Add(Pts[i] + Side * (A * HalfHere) - FVector(0.f, 0.f, bRim ? 25.f : 0.f));
 			N.Add(FVector::UpVector);
 			UV.Add(FVector2D(Along / 600.f, A * 0.5f + 0.5f));
 			// heat: 1 down the middle, falling to (1 - CrustAt) at the banks; rafts of crust (Perlin, ~25 m) cool it in places
@@ -1158,7 +1174,8 @@ void AWRRoundIsland::PlaceLife()
 		if (!Sp) return;
 		Sp->CreatureId = Kind;
 		Sp->Count = FMath::RandRange(Def->PackMin, FMath::Max(Def->PackMin, Def->PackMax));
-		Sp->Radius = FMath::Max(250.f, 120.f * Sp->Count);
+		// (by the body: 1.2 m an animal put a mammoth pack in a 6 m circle)
+		Sp->Radius = FMath::Max(250.f, FMath::Max(120.f, Def->Radius * 1.7f) * Sp->Count);
 		Sp->RespawnSeconds = Respawn;
 		Sp->ActivationRadius = Act;
 		Sp->bTraceGround = true;

@@ -1023,13 +1023,35 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Collars** (round 13): `Tools/art/fix_collars.py` reshapes Rimeguard's Rime_Fur ring and Dunewrap's Dune_Linen
   ring on every build and LOD. Run it only on the lab's meshes: a second run deforms them again, so `git checkout`
   the meshes first.
-- **The Crevasse Maze** (round 12): CrevasseMaze fits a plane to the ground under it and lays the field in that
-  plane's frame (yaw so the rows run down the slope, tilted to it; F(x, y, z) maps field -> place). The rows are
-  SM_CrevasseRow_0..5, one per row because the shared surface past the ends uses the field's x; they collide as drawn,
-  and are 4 m tall over the field's mean ground. SM_CrevasseFill_A fills each crevasse's ends (it collides: the way
-  out). The bridges are SM_SnowBridge_A/B and SM_IceBridge_A with box collision; each snow bridge is a hazard whose
-  Whole is its mesh. Its column test (WRIslandHazards) is straight down, whatever the bridge's tilt. The kit's
-  S.R / S.J hash 5 cm cells of the place, so seed them with points a metre apart (Rn / Jn), never raw indices.
+- **The Crevasse Maze** (round 14; rounds 12-13 stood rows of ice on a fitted plane, SM_CrevasseRow_0..5 and
+  SM_CrevasseFill_A, now unused): the crevasses are cut into the ground. `round_ground.mjs` fits the slope under the
+  place, lays five slots down it (land file `crevasses`: the field's frame U/V and each slot's middle, half length,
+  half width, depth and end ramp, m), cuts the ground over the whole field (HfHidden) and adds each slot to the
+  `underground` ways (a body on a crevasse's floor is rightly under the ground). `WRLandCaves` draws the field: the
+  slots' air (`LcSlotAir`) is carved like a cave's, the ground between them is the skin in the land's own look.
+  CrevasseMaze lays the bridges across the slots from the land's data (`FWRLandDef::Crevasses`), the poles, ice
+  fallen in and the seracs. The bridges are SM_SnowBridge_A/B and SM_IceBridge_A with box collision; each snow bridge
+  is a hazard whose Whole is its mesh. Its column test (WRIslandHazards) is straight down, whatever the bridge's tilt.
+  The kit's S.R / S.J hash 5 cm cells of the place, so seed them with points a metre apart (Rn / Jn), never raw
+  indices.
+- **Ice walls** (round 14): the Tundra's steep ice (glacier, ice, crevasse and lake ice samples steeper than
+  landCaves.wallFrom..wallTo, 44-56 degrees, in a Tundra zone) grows out of the land in `WRLandCaves`: the rock's
+  field takes the ground pushed out of the face (`LcWallPush`: 0.7-1.9 m, ribs top to bottom, set back in steps),
+  so a face stands proud of the land in fluted ice and its top and foot roll into the ground; coloured as weathered
+  ice with the strata faint (`WIce`), snow on its ledges. The SM_IceFace panels are no longer laid
+  (fire_frost_dressing.mjs ICE_FACES). landCaves.walls 0 turns them off (-wrtune=landCaves.walls:0). Cost, measured
+  in the editor's game at 40-54 degrees: ~1,600 more cave meshes, +2.7 GB on a client and +1.9 GB on the server
+  (each procedural mesh ~1.7 MB with its collision); frame times stayed at the 60 fps cap. Cubes that stand in for
+  cut ground (caves, crevasses) are built before any wall. The same code grows the Volcanic's steep ground in rock
+  (landCaves.rockWalls 1, rockFrom/rockTo 44-58): off, it cost +12 GB on a client for little on its dark ridges.
+  The Volcanic's SM_Crag panels are not laid any more (they read as brick walls); its steep ground draws layered
+  rock in M_IslandGround. Growing walls more widely wants baked Nanite meshes, not procedural ones.
+- **Cuts in the land** (round 14): a land chunk hangs a 0.9 m skirt round every cut square (a cave's mouth, the
+  maze), and the caves' skin is dropped only where the land draws all round it two cells out: either alone left a
+  hairline along a cut's edge.
+- **Clear ice** (round 14): M_IslandGround draws ground whose own roughness is under ~0.2 after the soft blend (lake
+  ice 0.06, the cirque's polished ice 0.08) as black ice: glossy, the textures' grain gone, cracks and bubbles at
+  odd angles and sizes (at one square size they tiled into a grid from the air).
 - **Outfit meshes** (round 11): the lab's outfits came with parts wound inside out (270 of 408 meshes);
   Tools/art/check_outfit_winding.py checks them (WR_FIX=1 turns them). Run it on any outfit mesh brought in. Trim (vertex
   colour R) blends by the base materials' TrimAmount (0.4, Tools/art/fix_outfit_trim.py); per-material looks in

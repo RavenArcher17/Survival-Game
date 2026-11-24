@@ -293,6 +293,40 @@ namespace WRLandHfImpl
 			}
 		}
 		D.BuildFirst = LLine(J, TEXT("buildFirst"));
+		if (J->TryGetArrayField(TEXT("crevasses"), A))
+		{
+			for (const TSharedPtr<FJsonValue>& V : *A)
+			{
+				const TSharedPtr<FJsonObject> O = V->AsObject();
+				if (!O.IsValid()) continue;
+				FWRLandCrevasses& F = D.Crevasses.AddDefaulted_GetRef();
+				FString S;
+				if (O->TryGetStringField(TEXT("id"), S)) F.Id = FName(*S);
+				const auto V2 = [&O](const TCHAR* Key, const FVector2D& Def)
+				{
+					const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
+					return O->TryGetArrayField(Key, X) && X->Num() >= 2 ? FVector2D((*X)[0]->AsNumber(), (*X)[1]->AsNumber()) : Def;
+				};
+				F.At = V2(TEXT("at"), FVector2D::ZeroVector);
+				F.U = V2(TEXT("u"), FVector2D(1.f, 0.f));
+				F.V = V2(TEXT("v"), FVector2D(0.f, 1.f));
+				const TArray<TSharedPtr<FJsonValue>>* Sl = nullptr;
+				if (O->TryGetArrayField(TEXT("slots"), Sl))
+				{
+					for (const TSharedPtr<FJsonValue>& SV : *Sl)
+					{
+						const TArray<TSharedPtr<FJsonValue>>* X = nullptr;
+						if (!SV->TryGetArray(X) || X->Num() < 6) continue;
+						FWRLandCrevasses::FSlot& T = F.Slots.AddDefaulted_GetRef();
+						T.C = FVector2D((*X)[0]->AsNumber(), (*X)[1]->AsNumber());
+						T.HalfLen = float((*X)[2]->AsNumber());
+						T.HalfW = float((*X)[3]->AsNumber());
+						T.Depth = float((*X)[4]->AsNumber());
+						T.Ramp = float((*X)[5]->AsNumber());
+					}
+				}
+			}
+		}
 		if (J->TryGetArrayField(TEXT("caves"), A))
 		{
 			const auto Num = [](const TArray<TSharedPtr<FJsonValue>>& X, int32 i) { return X.IsValidIndex(i) ? float(X[i]->AsNumber()) : 0.f; };
@@ -2179,6 +2213,38 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 		{
 			const int32 T0 = r * 2, B0 = T0 + 1, T1 = T0 + 2, B1 = T0 + 3;
 			Sk.Tris.Append({ T0, B0, T1, T1, B0, B1, T0, T1, B0, T1, B1, B0 });
+		}
+		// And a short one round every cut in it (a cave's mouth, round 14): the caves' skin over the cut lies under the land
+		// along its edge, and from inside the cut that step showed as a dark hairline along each edge of it, across the snow
+		// in front of the Hollow Ice.
+		const auto SquareGone = [&](int32 i, int32 j)
+		{
+			if (i < 0 || j < 0 || i + 1 >= VX || j + 1 >= VY) return false;   // past the chunk: its rim's skirt
+			const int32 A = j * VX + i;
+			return Gone[A] || Gone[A + 1] || Gone[A + VX] || Gone[A + VX + 1];
+		};
+		const auto HoleSkirt = [&](int32 Ai, int32 Aj, int32 Bi, int32 Bj)
+		{
+			const int32 T0 = Sk.Verts.Num();
+			AddVert(Sk, I0 + Is[Ai], J0 + Js[Aj], 0.f);
+			// (m: the cave's floor just inside a mouth's cut runs in under the ground's level, and 15 cm left the crack;
+			// a cut is only where the cave's air comes within 1.2 m of the surface, so 0.9 m stays in its rock)
+			AddVert(Sk, I0 + Is[Ai], J0 + Js[Aj], 0.9f);
+			AddVert(Sk, I0 + Is[Bi], J0 + Js[Bj], 0.f);
+			AddVert(Sk, I0 + Is[Bi], J0 + Js[Bj], 0.9f);
+			const int32 B0 = T0 + 1, T1 = T0 + 2, B1 = T0 + 3;
+			Sk.Tris.Append({ T0, B0, T1, T1, B0, B1, T0, T1, B0, T1, B1, B0 });
+		};
+		for (int32 j = 0; j + 1 < VY; ++j)
+		{
+			for (int32 i = 0; i + 1 < VX; ++i)
+			{
+				if (SquareGone(i, j)) continue;
+				if (SquareGone(i - 1, j)) HoleSkirt(i, j, i, j + 1);
+				if (SquareGone(i + 1, j)) HoleSkirt(i + 1, j, i + 1, j + 1);
+				if (SquareGone(i, j - 1)) HoleSkirt(i, j, i + 1, j);
+				if (SquareGone(i, j + 1)) HoleSkirt(i, j + 1, i + 1, j + 1);
+			}
 		}
 	}
 	FLodChunk& Have = LodChunks.FindOrAdd(Cell);

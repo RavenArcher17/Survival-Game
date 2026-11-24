@@ -74,12 +74,12 @@ const PLAN = {
 		T("pine", 1.5, 0.7, 1.1, 26, 0.7, ON("cinder_grass")), T("kipuka_shrub", 2, 0.6, 1.0, 30, 0.5, ON("cinder_grass")), T("lava_rubble", 12, 0.6, 1.1, 16, 0.7)],
 	V7: [T("char_tree", 28, 0.9, 1.6, 30, 0.45), T("ember_shrub", 6, 0.7, 1.2, 30, 0.5), T("basalt_rock", 0.4, 0.6, 1.2, 38)],
 	T1: [T("granite_rock", 1.2, 0.8, 2.2, 38), T("frost_shrub", 1.5, 0.6, 1.0, 30, 0.5), T("ice_boulder", 0.4, 0.6, 1.3, 38)],
-	T2: [T("pine", 32, 0.75, 1.3, 30, 0.45), T("frost_shrub", 5, 0.6, 1.1, 30, 0.5), T("granite_rock", 0.4, 0.7, 1.6, 38)],
-	T3: [T("pine", 3, 0.7, 1.2, 26, 0.7), T("frost_shrub", 5, 0.5, 0.9, 30, 0.5), T("ice_boulder", 0.8, 0.6, 1.4, 38)],
+	T2: [T("snow_pine", 32, 0.75, 1.3, 30, 0.45), T("frost_shrub", 5, 0.6, 1.1, 30, 0.5), T("granite_rock", 0.4, 0.7, 1.6, 38)],
+	T3: [T("snow_pine", 3, 0.7, 1.2, 26, 0.7), T("frost_shrub", 5, 0.5, 0.9, 30, 0.5), T("ice_boulder", 0.8, 0.6, 1.4, 38)],
 	T4: [T("serac", 0.7, 0.8, 1.45, 45, 0.6, null, [2, 5, 3.5, 9]), T("ice_boulder", 2.5, 0.6, 1.6, 40)],
 	T5: [T("ice_boulder", 1.5, 0.6, 1.5, 40), T("serac", 0.18, 0.8, 1.35, 40, 0.6, null, [1, 4, 3.5, 8]), T("basalt_rock", 6, 0.6, 1.4, 40, 0, ON("basalt"))],
-	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
-	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("pine", 0.2, 0.8, 1.1, 24, 0.8)],
+	T6: [T("frost_shrub", 7, 0.5, 1.0, 30, 0.5), T("snow_pine", 1.2, 0.7, 1.1, 26, 0.7), T("granite_rock", 0.6, 0.7, 1.6, 38)],
+	T7: [T("granite_rock", 1.2, 0.8, 2.4, 38), T("frost_shrub", 0.8, 0.6, 1.0, 30, 0.5), T("snow_pine", 0.2, 0.8, 1.1, 24, 0.8)],
 };
 // A hash random per cell (the same on every run).
 const rand = (i, j, k) => { let h = (Math.imul(i, 374761393) + Math.imul(j, 668265263) + Math.imul(k, 2147483647)) | 0; h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16; return (h >>> 0) / 4294967296; };
@@ -109,9 +109,9 @@ for (let gx = -6600; gx < 6600; gx += C) {
 				else if (P.only) { if (!P.only.has(sf)) continue; }
 				else if (BARE.has(sf) || sf === SURF.kipuka && P.kind !== "pine" && P.kind !== "kipuka_shrub") continue;
 				if (P.only !== "steep" && sl > P.slope) continue;
-				if (!isClear(x, y, P.kind === "pine" || P.kind === "char_tree" ? 3 : 1.5)) continue;
+				if (!isClear(x, y, P.kind === "pine" || P.kind === "snow_pine" || P.kind === "char_tree" ? 3 : 1.5)) continue;
 				const ld = lavaDist(x, y);
-				if (ld < LAND.lava.width / 2 + (P.kind === "char_tree" || P.kind === "pine" ? 18 : 8)) continue;
+				if (ld < LAND.lava.width / 2 + (P.kind === "char_tree" || P.kind === "pine" || P.kind === "snow_pine" ? 18 : 8)) continue;
 				const s = P.s0 + (P.s1 - P.s0) * rand(ci, cj, p * 7 + 4 + t * 13);
 				add(P.kind, x, y, h, rand(ci, cj, p * 7 + 5 + t * 13) * 360, s);
 				if (P.group) {
@@ -186,6 +186,9 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 		const dx = -gxh / gl, dy = -gyh / gl;
 		const z = h;
 		if (/^T/.test(zc) && ICE.has(sf)) continue;   // the ice walls are laid along their foot (below)
+		// (round 14: none in the Volcanic: laid close up every ridge, terrace and bank they read as brick walls; its steep
+		// ground grows out of the land as rock instead, WRLandCaves LcWallPush)
+		if (!/^T/.test(zc)) continue;
 		const kind = /^T/.test(zc) ? "granite_cliff" : RED.has(sf) ? "scoria_cliff" : "basalt_cliff";
 		add(kind, x, y, z, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 903 + t * 11) - 0.5) * 16, 0.85 + 0.45 * rand(ci, cj, 904 + t * 11));
 		cliffs++;
@@ -199,10 +202,14 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 	// grow only to 1.6 and 1.3: WRWorldDressing bTall), facing down it and leaning back as the wall's steep middle does
 	// ("ice_cliff_pitch": from where the wall is 15% up to 85%; measured round the face's middle on a 60 m wall it lay
 	// back like an awning); along the wall the next one stands about two-thirds of a face's width on.
+	// (round 14: none laid. From the air the faces still read as rows of striped slabs, on the cirque's terraces like
+	// radiators, a lone one on a big wall like a door; the steep ice itself now grows out of the land as fluted ice walls,
+	// WRLandCaves LcWallPush, as the caves' mouths do. Kept here, off, should panels be wanted somewhere again.)
+	const ICE_FACES = false;
 	const anchors = new Map(), AC = 12;
 	const near = (x, y, r) => { for (let i = Math.floor((x - r) / AC); i <= Math.floor((x + r) / AC); i++) for (let j = Math.floor((y - r) / AC); j <= Math.floor((y + r) / AC); j++) for (const [ax, ay] of anchors.get(i + "," + j) || []) if (Math.hypot(x - ax, y - ay) < r) return true; return false; };
 	let walls = 0;
-	for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
+	if (ICE_FACES) for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
 		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
 		const x = gx + rand(ci, cj, 931) * CLIFF_STEP, y = gy + rand(ci, cj, 932) * CLIFF_STEP;
 		const zc = zoneAt(x, y);

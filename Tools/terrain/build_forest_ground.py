@@ -256,6 +256,17 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     rock_c = lerp(mask(rock_y, "r", "g", "b"), mask(rock_x, "r", "g", "b"), side)
     rock_n = sample(MW + "Rock_nrm", mul(append2(wx, wz), k=1.0 / 420.0))
     if strong_tint:
+        # (round 14) steep ground layered: the Volcanic's cliffs (their rock panels gone: brick walls) and the Tundra's
+        # rock faces are flows laid one on another, bands lighter and darker a metre or three thick, wandering a little,
+        # finer ones in them; a cliff no longer reads as one smooth draped face.
+        var_r = "/Game/MWLandscapeAutoMaterial/Textures/Extra/TEX_MWAM_Variation_msk"
+        warp_r = mask(sample(var_r, mul(xy, k=1.0 / 2200.0)), "r")
+        fr = frac(add(mul(wz, k=1.0 / 230.0), mul(warp_r, k=1.6)))
+        fr2 = frac(add(mul(wz, k=1.0 / 97.0), mul(warp_r, k=0.9)))
+        tw = unary(unreal.MaterialExpressionAbs, add(mul(fr, k=2.0), k=-1.0))
+        layers_r = add(mul(sat(mul(add(tw, k=-0.35), k=3.0)), k=0.3), mul(fr2, k=0.12))
+        rock_c = mul(rock_c, add(layers_r, k=0.8))
+    if strong_tint:
         # (round 7) steep ice stays ice: where the land's colour is bright (the ice shelves' and the glacier's faces,
         # WRLand slopeRock.ice) the snow and ice texture streaks down the face with half the rock's relief; drawn as rock,
         # a glacier's knob read as grey stone with the ice faces stuck on it. Steep snowfields keep their rock showing.
@@ -329,6 +340,36 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         lava_r = lerp(lerp(const(0.82), const(0.5), h_lava), const(0.93), aa)
         lava_r = op(unreal.MaterialExpressionMin, lava_r, add(land_r, k=0.1))
         rough = lerp(rough, lava_r, lava_w)
+    if strong_tint:
+        # ---- black ice (round 14: the Frozen Lakes read as grey concrete, the sand's grain under a matte finish). Where the
+        # land's own roughness is very low (lake ice, 0.06: the vertex alpha is 1 - roughness) the ground is clear ice: the
+        # textures' grain gone, the land's dark blue-green over slow patches of thicker and thinner ice, white cracks
+        # wandering through it and bubbles caught in it, nearly a mirror (the sky in it), flat but for a faint swell.
+        land_r_i = sub(const(1.0), mask(vc, "a"))
+        # (the land's soft blend leaves a tenth of the zone's own 0.9 in it: lake ice's 0.06 arrives as ~0.14, the cirque's
+        # polished 0.08 as ~0.16; acid, 0.25, as ~0.31, stays as it was)
+        clear = mul(sat(mul(sub(const(0.26), land_r_i), k=9.0)), sub(const(1.0), rock_w))
+        var_i = "/Game/MWLandscapeAutoMaterial/Textures/Extra/TEX_MWAM_Variation_msk"
+
+        def turned_i(deg, size, off):
+            c, s_ = math.cos(math.radians(deg)), math.sin(math.radians(deg))
+            return mul(add(append2(add(mul(wx, k=c), mul(wy, k=s_)), add(mul(wx, k=-s_), mul(wy, k=c))), const(off)), k=1.0 / size)
+        # (each pattern at its own odd size and angle: at 4.7 m square to the world the cracks tiled into a grid seen
+        # from the air; the fine ones fade out with distance)
+        v1 = sample(var_i, turned_i(23.0, 2900.0, 0.0))
+        v2 = sample(var_i, turned_i(-61.0, 1130.0, 37.0))
+        v3 = sample(var_i, turned_i(104.0, 1730.0, 11.0))
+        near_i = sub(const(1.0), sat(mul(add(op(unreal.MaterialExpressionDistance, expr(unreal.MaterialExpressionCameraPositionWS), wp), k=-1500.0), k=1.0 / 4000.0)))
+
+        def crack(v, w):
+            return sat(sub(const(1.0), mul(unary(unreal.MaterialExpressionAbs, add(v, k=-0.5)), k=w)))
+        cracks = mx(mul(crack(mask(v1, "r"), 90.0), k=0.75), mul(mul(crack(mask(v2, "g"), 70.0), mask(v3, "r")), mul(near_i, k=0.7)))
+        bubbles = mul(mul(sat(mul(add(mask(v2, "b"), k=-0.62), k=3.0)), k=0.25), near_i)
+        thick = add(mul(lerp(mask(v1, "b"), mask(v3, "g"), const(0.5)), k=0.6), k=0.7)
+        ice_col = add(mul(rgb, thick), mul(const3((0.55, 0.62, 0.68)), mx(cracks, bubbles)))
+        albedo = lerp(albedo, ice_col, clear)
+        normal = lerp(normal, const3((0.0, 0.0, 1.0)), mul(clear, k=0.85))
+        rough = lerp(rough, add(const(0.03), mul(mx(cracks, bubbles), k=0.3)), clear)
     if strong_tint:
         # (the island: two sizes, half as strong; at 0.34 on one 31 m size the meadow read as camouflage from the air)
         far = add(mul(noise(mul(xy, k=1.0 / 5200.0)), k=0.6), mul(noise(mul(xy, k=1.0 / 1900.0)), k=0.4))

@@ -301,7 +301,7 @@ AWRDressing* UWRDressingSubsystem::FindDressing(const UWorld* World)
 // trunk / footprint radius (cm, times the instance's scale) measured to from the swinging character.
 struct FWRHarvestSpec { const TCHAR* Kind; const TCHAR* Group; const TCHAR* Item; float Radius; };
 static const FWRHarvestSpec HarvestSpecs[] = {
-	{ TEXT("char_tree"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("pine"), TEXT("tree"), TEXT("wood"), 30.f },
+	{ TEXT("char_tree"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("pine"), TEXT("tree"), TEXT("wood"), 30.f }, { TEXT("snow_pine"), TEXT("tree"), TEXT("wood"), 30.f },
 	{ TEXT("basalt_rock"), TEXT("rock"), TEXT("stone"), 110.f }, { TEXT("ice_rock"), TEXT("rock"), TEXT("stone"), 90.f },
 	{ TEXT("ember_shrub"), TEXT("shrub"), TEXT("fiber"), 55.f }, { TEXT("snow_shrub"), TEXT("shrub"), TEXT("fiber"), 60.f },
 	// Storm peaks (Tools/terrain/storm_peaks.mjs): wind-bent mountain pine and krummholz, granite boulders, alpine scrub.
@@ -407,6 +407,9 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("char_tree"), { { Cyl, FLinearColor(0.02f, 0.015f, 0.012f), FVector(40, 40, 520), 240, true, 24000, FVector::ZeroVector },
 		                       { Cone, FLinearColor(0.03f, 0.025f, 0.02f), FVector(180, 180, 260), 520, false, 24000, FVector::ZeroVector } } },
 		{ TEXT("pine"), { { Cyl, FLinearColor(0.12f, 0.06f, 0.03f), FVector(45, 45, 300), 140, true, 24000, FVector::ZeroVector },
+		                  { Cone, FLinearColor(0.02f, 0.12f, 0.05f), FVector(300, 300, 620), 520, false, 24000, FVector::ZeroVector },
+		                  { Cone, FLinearColor(0.92f, 0.95f, 0.98f), FVector(150, 150, 220), 760, false, 24000, FVector::ZeroVector } } },
+		{ TEXT("snow_pine"), { { Cyl, FLinearColor(0.12f, 0.06f, 0.03f), FVector(45, 45, 300), 140, true, 24000, FVector::ZeroVector },
 		                  { Cone, FLinearColor(0.02f, 0.12f, 0.05f), FVector(300, 300, 620), 520, false, 24000, FVector::ZeroVector },
 		                  { Cone, FLinearColor(0.92f, 0.95f, 0.98f), FVector(150, 150, 220), 760, false, 24000, FVector::ZeroVector } } },
 		{ TEXT("basalt_rock"), { { Sphere, FLinearColor(0.025f, 0.022f, 0.022f), FVector(260, 220, 150), 30, true, 24000, FVector(8, 0, 0) } } },
@@ -547,8 +550,12 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		{ TEXT("char_tree"), { { Prop(TEXT("CharTreeA"), TEXT("char_tree_a_textured")), Prop(TEXT("CharTreeB"), TEXT("char_tree_b_textured")),
 		    Prop(TEXT("CharTreeC"), TEXT("char_tree_c_textured")), Prop(TEXT("CharTreeD"), TEXT("char_tree_d_textured")) },
 			FVector(0, 0, 720), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
-		{ TEXT("pine"), { { Prop(TEXT("PineA"), TEXT("pine_a_cropped")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")),
-		    Prop(TEXT("FirA"), TEXT("fir_a_textured")), Prop(TEXT("BirchA"), TEXT("birch_a_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		// (round 14: green pines only: the kipuka's grew the Tundra's snow-laden spruce and frosted birch in summer green)
+		{ TEXT("pine"), { { Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("PineC"), TEXT("pine_c_textured")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
+		// The Tundra's (round 14): the snow-laden spruce (FirA) twice over, the dark green pine (PineB) and the frosted one
+		// (PineA) (PineC, gnarled and red-trunked, read as a bonsai in the snow; BirchA as crumpled foil up close).
+		{ TEXT("snow_pine"), { { Prop(TEXT("FirA"), TEXT("fir_a_textured")), Prop(TEXT("PineB"), TEXT("pine_b_textured")), Prop(TEXT("FirA"), TEXT("fir_a_textured")),
+		    Prop(TEXT("PineA"), TEXT("pine_a_cropped")) }, FVector(0, 0, 1000), 25, false, 24000, FVector::ZeroVector, true, nullptr, {}, {}, true } },
 		{ TEXT("basalt_rock"), { Rocks, FVector(260, 220, 150), 25, true, 24000, FVector(8, 0, 0), false, RockMat, { { TEXT("Tint"), FLinearColor(0.11f, 0.1f, 0.095f) } }, { { TEXT("Dust"), 0.55f } } } },
 		// (M_Rock's coats, 11-22: snow lying on the tundra's rocks, ash settled on the volcanic's.)
 		{ TEXT("ice_rock"), { Rocks, FVector(200, 170, 160), 25, true, 24000, FVector(12, 0, 18), false, RockMat, { { TEXT("Tint"), FLinearColor(0.62f, 0.74f, 0.88f) } }, { { TEXT("Snow"), 0.9f } } } },
@@ -565,7 +572,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// dark pillars (the rock meshes stretched tall and tinted).
 		// (Ice in its own glacier-ice material, M_IceBlock: the rock texture under M_Rock is too dark for ice, whatever its
 		// tint; the engine shape material it had read as flat blue plastic.)
-		{ TEXT("serac"), { Gen(TEXT("SM_Serac"), TEXT("ABCD")), FVector(300, 260, 620), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Tint"), FLinearColor(0.92f, 0.97f, 1.f) } }, {} } },
+		// (round 14: 3 x 2.6 x 6.2 m, in their groups they stood like gravestones; now chunks as wide as they're tall)
+		{ TEXT("serac"), { Gen(TEXT("SM_Serac"), TEXT("ABCD")), FVector(440, 380, 520), 60, true, 30000, FVector(6, 0, 8), false, IceMat, { { TEXT("Tint"), FLinearColor(0.92f, 0.97f, 1.f) } }, {} } },
 		{ TEXT("ice_boulder"), { Rocks, FVector(220, 190, 170), 25, true, 24000, FVector(12, 0, 18), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, {} } },
 		// (11-22: the blades and columns were the rock set's boulders stretched tall; now real shapes of their own.)
 		{ TEXT("obsidian_blade"), { Gen(TEXT("SM_ObsidianBlade"), TEXT("ABC")), FVector(210, 180, 420), 50, true, 20000, FVector(10, 0, 8), false, ObsidianMat, {}, {} } },

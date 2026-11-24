@@ -521,8 +521,10 @@ namespace WRIsleV
 		const bool bClearing = WRIsleLook::RowPoint(S, nullptr, TEXT("clearing"), ShrineAt);
 		const FVector ShrineL = bClearing ? S.Local(FVector(ShrineAt, 0.f)) : FVector(1e7f);
 		TArray<FTransform> Pines[4], Shrubs;
-		const TCHAR* PineMesh[4] = { TEXT("/Game/Props/PineA/pine_a_cropped/StaticMeshes/pine_a_cropped.pine_a_cropped"), TEXT("/Game/Props/PineB/pine_b_textured/StaticMeshes/pine_b_textured.pine_b_textured"),
-			TEXT("/Game/Props/PineC/pine_c_textured/StaticMeshes/pine_c_textured.pine_c_textured"), TEXT("/Game/Props/FirA/fir_a_textured/StaticMeshes/fir_a_textured.fir_a_textured") };
+		// (round 14: the green pine, with now and then an old gnarled one; the snow-laden spruce stood in the warm kipuka in
+		// a coat of snow, and half of them gnarled read as a bonsai garden)
+		const TCHAR* PineMesh[4] = { TEXT("/Game/Props/PineB/pine_b_textured/StaticMeshes/pine_b_textured.pine_b_textured"), TEXT("/Game/Props/PineB/pine_b_textured/StaticMeshes/pine_b_textured.pine_b_textured"),
+			TEXT("/Game/Props/PineC/pine_c_textured/StaticMeshes/pine_c_textured.pine_c_textured"), TEXT("/Game/Props/PineB/pine_b_textured/StaticMeshes/pine_b_textured.pine_b_textured") };
 		int32 Placed = 0, Moths = 0;
 		for (int32 i = 0; i < 90 && Placed < 34; ++i)
 		{

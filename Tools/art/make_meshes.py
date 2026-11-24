@@ -187,23 +187,35 @@ def serac(name, seed):
     """A tower of ice broken off a glacier's front, in one piece (11-22: stacked boxes, even with noise, read as stacked
     cubes, totems): a leaning column of five to seven sheared faces, narrowing, its top snapped off at a slant with a
     ragged crest, meltwater runnels down some faces; a lesser block fused to one side, broken chunks at its foot."""
+    # (round 14: 4 x 2.7 x 8 m, a slim leaning prism with a star of snow on its jagged cap: in groups they read as
+    # gravestones, the Weeping Seracs as a palisade. Now a chunk of ice about as wide as it is tall, its top broken off in a
+    # step, a second block fused to it, its cap ragged but not spiked.)
     rnd = random.Random(seed)
     raw = Raw()
-    sides = rnd.randint(5, 7)
-    ax, ay = rnd.uniform(170, 230), rnd.uniform(110, 160)
+    sides = rnd.randint(6, 8)
+    ax, ay = rnd.uniform(210, 270), rnd.uniform(160, 220)
     angs = sorted(2 * math.pi * k / sides + rnd.uniform(-0.3, 0.3) * 2 * math.pi / sides for k in range(sides))
     base = [(math.cos(a) * ax * rnd.uniform(0.85, 1.1), math.sin(a) * ay * rnd.uniform(0.85, 1.1)) for a in angs]
-    H = rnd.uniform(650, 950)
-    sl = (rnd.uniform(-0.7, 0.7), rnd.uniform(-0.7, 0.7))
-    prism(raw, rnd, seed, base, -80.0, lambda x, y: H + sl[0] * x + sl[1] * y + 70.0 * fbm(x / 90, y / 90, 0, seed + 5),
-          nz=12, nw=5, mag=26.0, profile=lambda t: 1.0 - 0.3 * t ** 1.3, lean=(rnd.uniform(-0.05, 0.05), rnd.uniform(0.06, 0.15)), flutes=22.0, cap_jag=60.0)
+    H = rnd.uniform(480, 700)
+    sl = (rnd.uniform(-0.6, 0.6), rnd.uniform(-0.6, 0.6))
+    # where it broke: a step down across the top, one side lower than the other
+    ca = rnd.uniform(0, 2 * math.pi)
+    cut = (math.cos(ca), math.sin(ca))
+    drop = rnd.uniform(90, 200)
+
+    def top(x, y):
+        side = smooth(-20.0, 20.0, x * cut[0] + y * cut[1] - rnd_off)
+        return H + sl[0] * x + sl[1] * y + 45.0 * fbm(x / 90, y / 90, 0, seed + 5) - drop * side
+    rnd_off = rnd.uniform(-60.0, 60.0)
+    prism(raw, rnd, seed, base, -80.0, top,
+          nz=12, nw=6, mag=30.0, profile=lambda t: 1.0 - 0.22 * t ** 1.3, lean=(rnd.uniform(-0.06, 0.06), rnd.uniform(0.04, 0.12)), flutes=26.0, cap_jag=8.0)
     # a lesser block fused to its side
     a = rnd.uniform(0, 2 * math.pi)
-    c2 = (math.cos(a) * ax * 0.85, math.sin(a) * ay * 0.85)
-    r2, h2 = rnd.uniform(90, 130), H * rnd.uniform(0.35, 0.6)
+    c2 = (math.cos(a) * ax * 0.8, math.sin(a) * ay * 0.8)
+    r2, h2 = rnd.uniform(120, 170), H * rnd.uniform(0.45, 0.75)
     b2 = [(c2[0] + math.cos(q) * r2 * rnd.uniform(0.8, 1.1), c2[1] + math.sin(q) * r2 * rnd.uniform(0.8, 1.1)) for q in sorted(rnd.uniform(0, 2 * math.pi) for _ in range(5))]
     prism(raw, rnd, seed + 11, b2, -70.0, lambda x, y: h2 + 0.5 * (x - c2[0]) + 40.0 * fbm(x / 70, y / 70, 1, seed), nz=7, nw=3, mag=16.0,
-          profile=lambda t: 1.0 - 0.25 * t, lean=(rnd.uniform(-0.08, 0.08), rnd.uniform(-0.08, 0.08)), cap_jag=35.0)
+          profile=lambda t: 1.0 - 0.25 * t, lean=(rnd.uniform(-0.08, 0.08), rnd.uniform(-0.08, 0.08)), cap_jag=8.0)
     # chunks fallen at its foot
     for k in range(rnd.randint(2, 3)):
         a = rnd.uniform(0, 2 * math.pi)
@@ -681,7 +693,11 @@ def prism(raw, rnd, seed, base, z0, top, nz=10, nw=4, mag=18.0, profile=None, le
         for p in edge:
             q = (p[0] + (centre[0] - p[0]) * f, p[1] + (centre[1] - p[1]) * f, p[2] + (centre[2] - p[2]) * f)
             if f > 0:
-                q = (q[0], q[1], q[2] + cap_jag * fbm(q[0] / 60, q[1] / 60, 0, seed + 3))
+                # (round 14) the cap lies on the top itself (its slant and its broken step), not on a pyramid from the
+                # rim to the middle: drawn as a pyramid, a stepped top's facets turned every way and the snow on the
+                # seracs' tops read as pinwheels
+                ux, uy = q[0] - lean[0] * (zc - z0), q[1] - lean[1] * (zc - z0)
+                q = (q[0], q[1], top(ux, uy) + cap_jag * (0.5 * f + fbm(q[0] / 60, q[1] / 60, 0, seed + 3)))
             ring.append(raw.pt(q))
         rings.append(ring)
     raw.grid(rings, lambda c: (0.0, 0.0, 1.0))
