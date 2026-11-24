@@ -574,7 +574,8 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	const villages = WORLD.villages.filter((v) => /volcanic|tundra/.test(v.biome)).map((v) => {
 		const L = FFL.lands[v.biome], at = L.village;
 		const { camp, inland, ...rest } = v;
-		return { ...rest, map: "L_Wildreach", land: "island", at, yaw: yawTo(at, nearest(at, L.camps)) };
+		// (round 12) eight households in two loose rings (five in one ring read as a toy camp)
+		return { ...rest, huts: Math.max(rest.huts || 0, 8), map: "L_Wildreach", land: "island", at, yaw: yawTo(at, nearest(at, L.camps)) };
 	});
 	const shrineRows = (WORLD.shrines.list || WORLD.shrines).filter((s) => /volcanic|tundra/.test(s.biome)).map((s) => {
 		if (s.great || !s.at) return { ...s, map: "L_Wildreach" };

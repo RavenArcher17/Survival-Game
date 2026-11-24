@@ -550,9 +550,12 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		const z = FF.subZoneAt("tundra", [x, y]), n = fbm(x / 110, y / 110, 87, 3);
 		const dlk = lakeD(x, y);
 		if (dlk < 210 && (lakeRidge(x, y) > 0.35 || (dlk > 175 && fbm(x / 40, y / 40, 96, 2) > 0.1))) { S[k] = SURF.snow; continue; }   // pressure ridges, and drifts along the shore   // pressure ridges and drifts on the ice
-		if (dlk < 210) { S[k] = SURF.lake_ice; continue; }
+		// (round 12: a flat grey sheet) snow blown across the great lake's ice in long drifts along the wind, as on T3's lakes
+		if (dlk < 210) { S[k] = fbm((x * 0.94 + y * 0.34) / 26, (y * 0.94 - x * 0.34) / 150, 1068 + 61, 3) > 0.22 ? SURF.snow : SURF.lake_ice; continue; }
 		S[k] = z === "T1" ? (fbm(x / 45, y / 45, 1068 + 1, 2) > 0.45 ? SURF.lichen_rock : SURF.snow) : z === "T2" ? SURF.snow_forest
-			: z === "T3" ? (t3Lake(x, y) > 0.5 ? (fbm(x / 50, y / 50, 96, 2) > 0.35 ? SURF.snow : SURF.lake_ice) : SURF.snow)
+			// (round 12: the frozen lakes were flat grey sheets) dark clear ice, the snow on it blown into long drifts along
+			// the wind (an elongated noise, turned 20 degrees) and heaped along pressure ridges (thin noise contours)
+			: z === "T3" ? (t3Lake(x, y) > 0.5 ? (fbm((x * 0.94 + y * 0.34) / 26, (y * 0.94 - x * 0.34) / 150, 1068 + 61, 3) > 0.22 || Math.abs(fbm(x / 210, y / 210, 1068 + 62, 2)) < 0.03 ? SURF.snow : SURF.lake_ice) : SURF.snow)
 			: z === "T4" ? SURF.glacier
 			: z === "T5" ? (() => {   // the cirque floor one sheet of blue ice (Skaldrith's arena), the ice cap glacier
 				const db = Math.hypot(x - BOWL[0], y - BOWL[1]);
@@ -1040,7 +1043,9 @@ const land = {
 		{ id: "lava_crust", class: SURF.lava_crust, color: [66, 60, 58], rough: 0.95, layers: { stones: 1 } },
 		{ id: "snow", class: SURF.snow, soft: 1, color: [238, 242, 245], rough: 0.8, layers: { sand: 0.9, stones: 0.1 } },
 		{ id: "snow_forest", class: SURF.snow_forest, soft: 1, color: [214, 222, 224], rough: 0.85, layers: { sand: 0.6, litter: 0.4 } },
-		{ id: "lake_ice", class: SURF.lake_ice, soft: 1, color: [118, 156, 186], rough: 0.42, layers: { stones: 0.5, sand: 0.5 } },
+		// (round 12: pale grey-blue, the ground took it for snow and drew the snow texture on it; its stones showed as
+		// gravel) dark clear ice, smooth
+		{ id: "lake_ice", class: SURF.lake_ice, soft: 1, color: [74, 110, 138], rough: 0.22, layers: { sand: 1 } },
 		{ id: "glacier", class: SURF.glacier, soft: 1, color: [198, 222, 238], rough: 0.3, layers: { sand: 0.8, stones: 0.2 } },
 		{ id: "crevasse", class: SURF.crevasse, color: [92, 148, 200], rough: 0.4, layers: { stones: 1 } },
 		{ id: "thaw_moss", class: SURF.thaw_moss, soft: 1, color: [104, 106, 72], rough: 0.9, layers: { moss: 0.6, grass: 0.2, soil: 0.2 } },

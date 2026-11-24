@@ -2,6 +2,24 @@
 
 ## Unreleased
 
+### Round island: the look pass, eleventh round: the villages, the Crevasse Maze, the frozen lakes (11-23)
+
+From the tenth round's survey of the coast, the Volcanic and the Tundra (Raven: "go ahead and push what's next").
+- **Villages people live in:** Emberwick and Rimehold were five huts in one perfect ring of the same hut on bare ash or
+  snow, a toy camp. Eight households now (the round island's rows, `fire_frost_dressing.mjs`) in two loose rings,
+  every other one further out, each hut its own size and a little off its place (AWRVillage::BuildLook); by each door a
+  woodpile against the wall, a chopping block with its axe, and clay water jars (Emberwick) or a sled (Rimehold); round
+  the back, open to the path, a dry-stone wall with gaps (Emberwick) or windbreaks of cut snow blocks (Rimehold), both
+  solid.
+- **The Crevasse Maze broken up:** a 6 x 5 grid of the same cubes, a block of sugar from the air. Each block off its grid
+  place along its row (the safe line straight, its poles in a line), its own width, heights from shoulder-high to three
+  times that; ice fallen into the crevasses; the field breaking up at its edges into lone blocks and tilted slabs half
+  sunk in the glacier, so it fades into the ice round it. The crevasses keep their widths and the bridges their crossings.
+- **Frozen lakes with snow on them:** the Tundra's great lake and the Frozen Lakes were flat grey sheets. Their ice darker
+  and smooth (`lake_ice`), snow blown across it in long drifts along the wind and heaped on pressure ridges
+  (`round_ground.mjs`).
+- Round-island tests 0 failed (twice); the city 18.4 ms a frame, inside the north-west fort 10.4 ms.
+
 ### Every armour set the right way out and in its own colours (11-23)
 
 Raven: "Keep at it until they look perfect/correct". Every set worn by the bot, front and back, men and women.

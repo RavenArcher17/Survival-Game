@@ -1326,21 +1326,74 @@ void AWRVillage::BuildLook()
 	const FSurf Hide = FSurf::Cloth(FLinearColor(0.36f, 0.27f, 0.18f));
 	const FSurf Pole = FSurf::Wood(FLinearColor(0.16f, 0.11f, 0.07f));
 	const FSurf Lamp = FSurf::Lit(FLinearColor(1.f, 0.6f, 0.25f), 0.95f);
-	// The huts: in a ring round the shrine, doors toward it, the front (+X) kept open for the path and the stall.
+	// A household's things by a door (round 12: the huts stood bare on the ash and the snow, a toy camp): a woodpile
+	// against the wall, a chopping block with its axe, and (Emberwick) clay water jars or (Rimehold) a sled.
+	const FSurf Log = FSurf::Wood(bLavvu ? FLinearColor(0.3f, 0.26f, 0.21f) : FLinearColor(0.17f, 0.12f, 0.075f));
+	const FSurf Clay = FSurf::Stone(FLinearColor(0.34f, 0.17f, 0.09f), 0.85f);
+	const FSurf IronDark = FSurf::Steel(FLinearColor(0.05f, 0.048f, 0.045f), 0.55f);
+	const auto Ground = [this](const FVector& P) { return FVector(P.X, P.Y, SiteGroundZ(this, FVector2D(P))); };
+	const auto Household = [&](const FVector& C, float R, float DoorYaw, int32 h)
+	{
+		// the woodpile: three courses of logs along the wall, left of the door
+		const FVector Pile = Ground(C + FRotator(0.f, DoorYaw - 42.f, 0.f).Vector() * (R + 55.f));
+		for (int32 c = 0; c < 3; ++c)
+		{
+			for (int32 i = 0; i < 4 - c; ++i)
+			{
+				const FVector P = Pile + FRotator(0.f, DoorYaw - 42.f, 0.f).Vector() * ((i - (3 - c) * 0.5f) * 24.f) + FVector(0, 0, 11.f + c * 20.f);
+				K.Add(Log.Dim(0.85f + 0.3f * K.Rand(P, 41)), FVector(22.f, 22.f, 130.f + 20.f * K.Jit(P, 42)), P, FRotator(90.f, DoorYaw - 42.f + 90.f + 6.f * K.Jit(P, 43), 0.f), EWRLookMesh::Cylinder);
+			}
+		}
+		// the chopping block, an axe in it
+		const FVector Blk = Ground(C + FRotator(0.f, DoorYaw - 28.f, 0.f).Vector() * (R + 190.f));
+		K.Add(Log.Dim(1.2f), FVector(48.f, 48.f, 46.f), Blk + FVector(0, 0, 23.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+		K.Rod(Log.Dim(1.5f), Blk + FVector(6.f, 0.f, 52.f), Blk + FVector(-30.f, 10.f, 110.f), 5.f);
+		K.Add(IronDark, FVector(16.f, 4.f, 11.f), Blk + FVector(8.f, -1.f, 50.f), FRotator(-30.f, 0.f, 0.f));
+		if (!bLavvu)
+		{
+			// two or three clay water jars by the door
+			const int32 Jars = 2 + (K.Rand(C, 44) > 0.5f ? 1 : 0);
+			for (int32 j = 0; j < Jars; ++j)
+			{
+				const FVector P = Ground(C + FRotator(0.f, DoorYaw + 28.f + 7.f * j, 0.f).Vector() * (R + 70.f + 30.f * (j % 2)));
+				K.Add(Clay.Dim(0.85f + 0.3f * K.Rand(P, 45)), FVector(46.f, 46.f, 58.f), P + FVector(0, 0, 26.f), FRotator::ZeroRotator, EWRLookMesh::Sphere);
+				K.Add(Clay.Dim(0.75f), FVector(22.f, 22.f, 14.f), P + FVector(0, 0, 58.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			}
+		}
+		else if (h % 2 == 0)
+		{
+			// a sled drawn up beside the lavvu: two curved runners, slats across them
+			const FRotator SR(0.f, DoorYaw + 95.f, 0.f);
+			const FVector P = Ground(C + FRotator(0.f, DoorYaw - 110.f, 0.f).Vector() * (R + 150.f));
+			for (const float S : { -1.f, 1.f })
+			{
+				K.Add(Log.Dim(0.8f), FVector(220.f, 7.f, 9.f), P + SR.RotateVector(FVector(0.f, S * 38.f, 14.f)), SR);
+				K.Add(Log.Dim(0.8f), FVector(40.f, 7.f, 9.f), P + SR.RotateVector(FVector(122.f, S * 38.f, 30.f)), SR + FRotator(40.f, 0.f, 0.f));
+			}
+			for (int32 s = 0; s < 6; ++s) K.Add(Log, FVector(14.f, 90.f, 4.f), P + SR.RotateVector(FVector(-90.f + 34.f * s, 0.f, 22.f)), SR);
+		}
+	};
+	// The huts round the shrine, doors toward it, the front (+X) kept open for the path and the stall. (Round 12: one
+	// perfect ring of the same hut read as a toy camp: two loose rings now, every other hut further out, each its own
+	// size and a little off its place.)
 	for (int32 h = 0; h < Huts; ++h)
 	{
-		const float A = 70.f + (220.f / FMath::Max(1, Huts - 1)) * h;
-		const FVector2D C2 = FVector2D(FRotator(0.f, A, 0.f).Vector()) * Ring;
+		const FVector Key(float(h) * 97.f, 13.f, 7.f);
+		const float A = 55.f + (250.f / FMath::Max(1, Huts - 1)) * h + 7.f * K.Jit(Key, 31);
+		const float RingH = Ring * (h % 2 == 0 ? 1.f : 1.55f) * (1.f + 0.07f * K.Jit(Key, 32));
+		const float Sc = 0.86f + 0.28f * K.Rand(Key, 33);
+		const FVector2D C2 = FVector2D(FRotator(0.f, A, 0.f).Vector()) * RingH;
 		const float GZ = SiteGroundZ(this, C2);
 		const FVector C(C2, GZ);
-		const float DoorYaw = A + 180.f;   // facing the shrine
+		const float DoorYaw = A + 180.f + 10.f * K.Jit(Key, 34);   // facing the shrine, near enough
 		const FRotator Face(0.f, DoorYaw, 0.f);
+		Household(C, (bLavvu ? 220.f : 260.f) * Sc, DoorYaw, h);
 		if (!bLavvu)
 		{
 			// A round house of dry-laid basalt: twelve wall runs in three courses, the doorway gap toward the shrine,
 			// a cone roof of heather thatch dusted with ash, smoke curling from the hole at its peak. (11-22: a flame and a
 			// glowing disc sat on the peak, the roofs read as burning; the roof wore the cloth weave.)
-			const float R = 260.f;
+			const float R = 260.f * Sc;
 			for (int32 s = 0; s < 12; ++s)
 			{
 				const float SA = 30.f * s + 15.f;
@@ -1358,31 +1411,31 @@ void AWRVillage::BuildLook()
 			for (const float Side : { -1.f, 1.f }) K.Add(Pole, FVector(22.f, 22.f, 190.f), Door + Face.RotateVector(FVector(0, Side * 75.f, 95.f)), Face);
 			K.Add(Pole, FVector(30.f, 190.f, 22.f), Door + FVector(0, 0, 196.f), Face);
 			const FSurf Thatch = FSurf::Cloth(FLinearColor(0.13f, 0.105f, 0.07f)).WithPattern(WRLookPattern::Thatch);
-			K.Add(Thatch, FVector(560.f, 560.f, 260.f), C + FVector(0, 0, 186.f + 130.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
-			K.Add(Thatch.Dim(0.8f), FVector(600.f, 600.f, 20.f), C + FVector(0, 0, 190.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
-			K.Disc(FSurf::Cloth(FLinearColor(0.02f, 0.018f, 0.016f)), C + FVector(0, 0, 437.f), FVector::UpVector, 36.f, 6.f);   // the smoke hole
+			K.Add(Thatch, FVector(560.f * Sc, 560.f * Sc, 260.f * Sc), C + FVector(0, 0, 186.f + 130.f * Sc), FRotator::ZeroRotator, EWRLookMesh::Cone);
+			K.Add(Thatch.Dim(0.8f), FVector(600.f * Sc, 600.f * Sc, 20.f), C + FVector(0, 0, 190.f), FRotator::ZeroRotator, EWRLookMesh::Cylinder);
+			K.Disc(FSurf::Cloth(FLinearColor(0.02f, 0.018f, 0.016f)), C + FVector(0, 0, 186.f + 251.f * Sc), FVector::UpVector, 36.f, 6.f);   // the smoke hole
 			// The lantern by the door.
 			K.Add(Pole, FVector(10.f, 10.f, 170.f), Door + Face.RotateVector(FVector(60.f, 110.f, 85.f)), Face);
 			K.Add(Lamp, FVector(18.f, 18.f, 24.f), Door + Face.RotateVector(FVector(60.f, 110.f, 160.f)), Face);
 			if (bDraw)
 			{
 				SiteLight(this, RootComponent, Door + Face.RotateVector(FVector(70.f, 110.f, 160.f)), FLinearColor(1.f, 0.6f, 0.28f), 1600.f, 900.f);
-				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.8f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 445.f));
+				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.8f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 186.f + 259.f * Sc));
 			}
 		}
 		else
 		{
 			// A lavvu: twelve poles from a 2.2 m ring crossing above a 4.5 m apex, hide wrapped round them, the door
 			// flap toward the shrine, the smoke flap open at the top.
-			const float R = 220.f;
+			const float R = 220.f * Sc;
 			for (int32 p = 0; p < 12; ++p)
 			{
 				const FRotator PR(0.f, DoorYaw + 30.f * p + 15.f, 0.f);
 				const FVector Foot = C + PR.Vector() * R;
-				const FVector Top = C + PR.Vector() * -38.f + FVector(0, 0, 520.f);
+				const FVector Top = C + PR.Vector() * -38.f + FVector(0, 0, 520.f * Sc);
 				K.Rod(Pole, Foot, Top, 9.f);
 			}
-			K.Add(Hide, FVector(2.f * R + 10.f, 2.f * R + 10.f, 430.f), C + FVector(0, 0, 215.f), FRotator::ZeroRotator, EWRLookMesh::Cone);
+			K.Add(Hide, FVector(2.f * R + 10.f, 2.f * R + 10.f, 430.f * Sc), C + FVector(0, 0, 215.f * Sc), FRotator::ZeroRotator, EWRLookMesh::Cone);
 			const FVector Door = C + Face.Vector() * (R - 40.f);
 			K.Add(FSurf::Cloth(FLinearColor(0.05f, 0.04f, 0.03f)), FVector(6.f, 90.f, 150.f), Door + FVector(0, 0, 75.f), FRotator(-14.f, DoorYaw, 0.f));
 			K.Add(FSurf::Cloth(FLinearColor(0.5f, 0.05f, 0.04f)), FVector(4.f, 92.f, 12.f), Door + FVector(6.f, 0, 152.f), FRotator(-14.f, DoorYaw, 0.f));
@@ -1403,7 +1456,7 @@ void AWRVillage::BuildLook()
 			{
 				SiteLight(this, RootComponent, Door + Face.RotateVector(FVector(90.f, 100.f, 160.f)), FLinearColor(1.f, 0.6f, 0.28f), 1600.f, 900.f);
 				// (smoke from the flap: a flame at the poles' crossing read as the tent on fire, 11-22)
-				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.7f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 520.f));
+				if (USceneComponent* Smoke = WRFx::Attach(RootComponent, TEXT("kitchen.smoke"), NAME_None, 0.7f)) Smoke->SetRelativeLocation(C + FVector(0, 0, 520.f * Sc));
 			}
 		}
 	}
@@ -1445,6 +1498,44 @@ void AWRVillage::BuildLook()
 			for (const float Y : { -80.f, 80.f }) K.Rod(Pole, W + FVector(0.f, Y, 0.f), W + FVector(-20.f, Y, 190.f), 8.f);
 			for (const float Z : { 40.f, 170.f }) K.Rod(Pole, W + FVector(-Z * 0.1f, -90.f, Z), W + FVector(-Z * 0.1f, 90.f, Z), 7.f);
 			K.Add(Hide.Dim(1.15f), FVector(3.f, 150.f, 120.f), W + FVector(-10.f, 0.f, 105.f), FRotator(-6.f, 0.f, 0.f));
+		}
+	}
+	// (Round 12) Round the back of the village, open to the path: a dry-stone wall of the basalt, knee to hip high, with
+	// gaps (Emberwick), or windbreaks of cut snow blocks on the side the wind comes from (Rimehold).
+	{
+		const float WR = Ring * 2.15f;
+		const FSurf SnowBlock = FSurf::Ice(FLinearColor(0.78f, 0.82f, 0.88f));
+		for (float A = 95.f; A <= 265.f; A += 7.5f)
+		{
+			const FVector Key(A * 13.f, 5.f, 3.f);
+			if (K.Rand(Key, 51) < (bLavvu ? 0.32f : 0.14f)) continue;   // gaps (the windbreaks in short runs)
+			const FVector2D P2 = FVector2D(FRotator(0.f, A, 0.f).Vector()) * WR * (1.f + 0.025f * K.Jit(Key, 52));
+			const FVector P(P2, SiteGroundZ(this, P2));
+			const float Len = 2.f * PI * WR * 7.5f / 360.f + 10.f;
+			const FRotator Rot(0.f, A + 90.f, 0.f);
+			if (!bLavvu)
+			{
+				const float Ht = 70.f + 30.f * K.Rand(Key, 53);
+				for (int32 c = 0; c < 3; ++c)
+				{
+					for (int32 st = 0; st < 3; ++st)
+					{
+						const FVector Sp = P + Rot.RotateVector(FVector((st - 1) * Len / 3.f + 10.f * (c % 2), 0.f, Ht / 3.f * (c + 0.5f) - 12.f));
+						K.Add(Wall.Dim(0.8f + 0.3f * K.Rand(Sp, 54)), FVector(Len / 3.f + 8.f, 58.f - 10.f * c, Ht / 3.f + 6.f), Sp, Rot + FRotator(3.f * K.Jit(Sp, 55), 4.f * K.Jit(Sp, 56), 0.f));
+					}
+				}
+				SiteBlock(this, RootComponent, P + FVector(0, 0, Ht * 0.5f - 10.f), FVector(Len * 0.5f, 30.f, Ht * 0.5f + 10.f), Rot);
+			}
+			else
+			{
+				const float Ht = 95.f + 25.f * K.Rand(Key, 57);
+				for (int32 c = 0; c < 2; ++c) for (int32 st = 0; st < 2; ++st)
+				{
+					const FVector Sp = P + Rot.RotateVector(FVector((st - 0.5f) * Len / 2.f + 22.f * (c % 2), 0.f, Ht / 2.f * (c + 0.5f) - 8.f));
+					K.Add(SnowBlock.Dim(0.92f + 0.1f * K.Rand(Sp, 58)), FVector(Len / 2.f - 4.f, 50.f, Ht / 2.f - 3.f), Sp, Rot + FRotator(0.f, 3.f * K.Jit(Sp, 59), 0.f));
+				}
+				SiteBlock(this, RootComponent, P + FVector(0, 0, Ht * 0.5f - 8.f), FVector(Len * 0.5f, 26.f, Ht * 0.5f + 8.f), Rot);
+			}
 		}
 	}
 	// The path in from the steps: flagstones following the ground for 12 m.

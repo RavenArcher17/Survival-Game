@@ -696,20 +696,26 @@ namespace WRIsleT
 		const int32 Rows = 6, Cols = 5;
 		const float PitchX = 840.f, PitchY = 520.f, Block = 400.f, X0 = -2100.f, Y0 = -1040.f;
 		const int32 Safe = 1;
-		const auto TopZ = [&](int32 r, int32 c) { return S.Gz(X0 + PitchX * r, Y0 + PitchY * c) + 380.f + 120.f * S.R(FVector(r, c, 0), 1) - 30.f; };
+		// (round 12: a 6 x 5 grid of the same cubes, a block of sugar from the air) each block off its grid place along the
+		// row (the lanes between columns; the safe line stays straight, its poles in a line), its own width, and heights
+		// from shoulder-high to three times that.
+		const auto YAt = [&](int32 r, int32 c) { return Y0 + PitchY * c + (c == Safe ? 0.f : 70.f * S.J(FVector(r, c, 9), 7)); };
+		const auto TopZ = [&](int32 r, int32 c) { return S.Gz(X0 + PitchX * r, YAt(r, c)) + 330.f + 280.f * S.R(FVector(r, c, 0), 1) - 30.f; };
 		for (int32 r = 0; r < Rows; ++r)
 		{
 			for (int32 c = 0; c < Cols; ++c)
 			{
-				const float X = X0 + PitchX * r, Y = Y0 + PitchY * c;
+				const float X = X0 + PitchX * r + 25.f * S.J(FVector(r, c, 3), 8), Y = YAt(r, c);
 				const float Gz = S.Gz(X, Y);
 				const float H = TopZ(r, c) - Gz + 30.f;
+				const float Wy = 0.95f + 0.35f * S.R(FVector(r, c, 4), 9);
 				const FVector Ctr(X, Y, Gz + H * 0.5f - 30.f);
 				// (blocks of glacier ice, snow on their tops, each turned its own way; 11-22: white and blue boxes on a grid)
 				static const TCHAR* Blocks[3] = { TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), TEXT("/Game/Art/Gen/SM_IceBlock_B.SM_IceBlock_B"), TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C") };
 				const float Hs = (H + 60.f) / 400.f;
-				S.Shape(Blocks[(r * 3 + c) % 3], FVector(X, Y, Gz - 90.f), FRotator(0.f, 90.f * ((r * 3 + c) % 4) + 14.f * S.J(Ctr, 4), 0.f), FVector(Block * 1.12f / 400.f, Block * 1.12f / 400.f, Hs), false, false, FLinearColor::White, 0.75f);
-				S.Solid(Ctr + FVector(0, 0, 10.f), FVector(Block * 0.5f, Block * 0.5f, H * 0.5f + 20.f));
+				const float BYaw = 14.f * S.J(Ctr, 4);
+				S.Shape(Blocks[(r * 3 + c) % 3], FVector(X, Y, Gz - 90.f), FRotator(0.f, 90.f * ((r * 3 + c) % 4) + BYaw, 0.f), FVector(Block * 1.12f / 400.f, Block * 1.12f * Wy / 400.f, Hs), false, false, FLinearColor::White, 0.75f);
+				S.Solid(Ctr + FVector(0, 0, 10.f), FVector(Block * 0.5f, Block * 0.5f * Wy, H * 0.5f + 20.f), FRotator(0.f, BYaw, 0.f));
 				if (c == Safe)
 				{
 					const FVector Top = Ctr + FVector(Block * 0.35f, Block * 0.35f, H * 0.5f + 30.f);
@@ -721,7 +727,7 @@ namespace WRIsleT
 				const bool bSafe = c == Safe;
 				if (!bSafe && (c + r) % 2 != 0) continue;
 				const float Top = FMath::Min(TopZ(r, c), TopZ(r + 1, c)) + 10.f;
-				const FVector Mid(X + PitchX * 0.5f, Y, Top - 25.f);
+				const FVector Mid(X0 + PitchX * r + PitchX * 0.5f, (YAt(r, c) + YAt(r + 1, c)) * 0.5f, Top - 25.f);
 				const FVector Half((PitchX - Block) * 0.5f + 40.f, Block * 0.32f, 25.f);
 				if (bSafe)
 				{
@@ -754,7 +760,7 @@ namespace WRIsleT
 		// The ramps up onto the first row: packed snow at 30 degrees, at the safe line and at column 3.
 		for (const int32 c : { Safe, 3 })
 		{
-			const float Y = Y0 + PitchY * c;
+			const float Y = YAt(0, c);
 			const float TopR = TopZ(0, c) + 30.f;
 			const float Foot = X0 - Block * 0.5f - (TopR - S.Gz(X0 - Block, Y)) / FMath::Tan(FMath::DegreesToRadians(30.f));
 			const FVector A(Foot, Y, S.Gz(Foot, Y)), B(X0 - Block * 0.5f + 20.f, Y, TopR);
@@ -770,6 +776,26 @@ namespace WRIsleT
 			const float X = X0 + PitchX * r + PitchX * 0.5f;
 			// (dark old ice at the bottom: in the snow's stone look they read as grey paving, 11-22)
 			S.K.Add(P.DeepIce.Dim(0.45f), FVector(PitchX - Block, PitchY * Cols, 20.f), FVector(X, Y0 + PitchY * 2.f, S.Gz(X, Y0 + PitchY * 2.f) + 2.f));
+			// (round 12) ice fallen from the walls lying on the floor, tumbled
+			for (int32 k = 0; k < 4; ++k)
+			{
+				const FVector L(X + 120.f * S.J(FVector(r, k, 21), 21), Y0 - 200.f + (PitchY * Cols + 400.f) * S.R(FVector(r, k, 22), 22), 0.f);
+				const float Sz = 0.18f + 0.22f * S.R(L, 23);
+				S.Shape(TEXT("/Game/Art/Gen/SM_IceBlock_C.SM_IceBlock_C"), FVector(L.X, L.Y, S.Gz(L.X, L.Y) - 25.f), FRotator(25.f * S.J(L, 24), 360.f * S.R(L, 25), 25.f * S.J(L, 26)), FVector(Sz, Sz * 1.2f, Sz * 0.8f), false, false, FLinearColor::White, 0.5f);
+			}
+		}
+		// (round 12) the field breaks up at its edges into lone blocks and tilted slabs half sunk in the glacier, so it
+		// fades into the ice round it rather than ending in a rectangle; none on the way in at the ramps (-X side).
+		for (int32 i = 0; i < 26; ++i)
+		{
+			const float A = i * 137.508f, Frac = (i + 0.5f) / 26.f;
+			const FVector Dir(FMath::Cos(FMath::DegreesToRadians(A)), FMath::Sin(FMath::DegreesToRadians(A)), 0.f);
+			if (Dir.X < -0.45f) continue;
+			const FVector Mid(X0 + PitchX * (Rows - 1) * 0.5f, Y0 + PitchY * (Cols - 1) * 0.5f, 0.f);
+			const FVector L = Mid + FVector(Dir.X * (PitchX * Rows * 0.5f + 300.f + 900.f * Frac), Dir.Y * (PitchY * Cols * 0.5f + 300.f + 700.f * Frac), 0.f);
+			const float Sz = 0.35f + 0.55f * S.R(L, 31), Tilt = 30.f * S.J(L, 32);
+			S.Shape(TEXT("/Game/Art/Gen/SM_IceBlock_A.SM_IceBlock_A"), FVector(L.X, L.Y, S.Gz(L.X, L.Y) - 60.f * Sz), FRotator(Tilt, 360.f * S.R(L, 33), 20.f * S.J(L, 34)), FVector(Sz, Sz * (0.8f + 0.5f * S.R(L, 35)), Sz * (0.6f + 0.9f * S.R(L, 36))), false, false, FLinearColor::White, 0.7f);
+			S.Solid(FVector(L.X, L.Y, S.Gz(L.X, L.Y) + 100.f * Sz), FVector(170.f * Sz, 170.f * Sz, 100.f * Sz), FRotator(0.f, 0.f, 0.f));
 		}
 	}
 
