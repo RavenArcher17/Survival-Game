@@ -11,10 +11,21 @@ From the tenth round's survey of the coast, the Volcanic and the Tundra (Raven: 
   woodpile against the wall, a chopping block with its axe, and clay water jars (Emberwick) or a sled (Rimehold); round
   the back, open to the path, a dry-stone wall with gaps (Emberwick) or windbreaks of cut snow blocks (Rimehold), both
   solid.
-- **The Crevasse Maze broken up:** a 6 x 5 grid of the same cubes, a block of sugar from the air. Each block off its grid
-  place along its row (the safe line straight, its poles in a line), its own width, heights from shoulder-high to three
-  times that; ice fallen into the crevasses; the field breaking up at its edges into lone blocks and tilted slabs half
-  sunk in the glacier, so it fades into the ice round it. The crevasses keep their widths and the bridges their crossings.
+- **The Crevasse Maze, a real crevasse field** (Raven: "The maze looks like shit"): it was a 6 x 5 grid of the same
+  cubes standing on the snow, a pile of dice from any angle. It lies on ground falling 1 m in 2.2, so the field now
+  lies on the slope's own plane, its rows running down it. Each row is one length of glacier ice 41 m long: fluted
+  walls stepped where their layers end, broken into planes, wider at the foot, so each crevasse is a V; the lips
+  rounded over, with a cornice of snow here and there; the tops crowned with snow. The walls are blue, the tops white.
+  Each crevasse narrows to a lens at its ends, where drifted snow fills it in a ramp (fall in and you climb out up it).
+  Past the ends, and along the outer rows, the glacier swells up to the field in one smooth snow slope, scalloped by
+  the wind; the rows share one surface there, so no seams show. The bridges are arches thin in the middle that thicken
+  down the walls: old blue ice on the safe line, wind-packed snow pinched in the middle elsewhere. The snow bridges
+  each sit at their own place along their crevasse (the decoys had all fallen on one column: the maze's seeded
+  randoms hashed row numbers into one 5 cm cell). A snow bridge also waits for the column straight below it to be empty
+  before it grows back: on the slope its own frame's column leaned, missed whoever fell in, and the bridge grew back
+  over them. Played by a bot: the safe line crossed all five crevasses, a snow bridge dropped it 4.2 m when it stood on
+  one, it walked out of a crevasse up the drift, and it walked up the outer slope onto the first row.
+  (`make_meshes.py` crevasse_row / crevasse_fill / snow_bridge; CrevasseMaze in WRIslandPlacesLook2.cpp.)
 - **Frozen lakes with snow on them:** the Tundra's great lake and the Frozen Lakes were flat grey sheets. Their ice darker
   and smooth (`lake_ice`), snow blown across it in long drifts along the wind and heaped on pressure ridges
   (`round_ground.mjs`).

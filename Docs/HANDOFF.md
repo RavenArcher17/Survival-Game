@@ -1014,6 +1014,13 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   windbreak (lavvu) at 2.15 x ring round the back (95-265 degrees); the round island's villages have huts 8
   (fire_frost_dressing.mjs). The Tundra's frozen lakes are ground (lake_ice), not the Old Island's ice sheet (none is
   drawn on the round island).
+- **The Crevasse Maze** (round 12): CrevasseMaze fits a plane to the ground under it and lays the field in that
+  plane's frame (yaw so the rows run down the slope, tilted to it; F(x, y, z) maps field -> place). The rows are
+  SM_CrevasseRow_0..5, one per row because the shared surface past the ends uses the field's x; they collide as drawn,
+  and are 4 m tall over the field's mean ground. SM_CrevasseFill_A fills each crevasse's ends (it collides: the way
+  out). The bridges are SM_SnowBridge_A/B and SM_IceBridge_A with box collision; each snow bridge is a hazard whose
+  Whole is its mesh. Its column test (WRIslandHazards) is straight down, whatever the bridge's tilt. The kit's
+  S.R / S.J hash 5 cm cells of the place, so seed them with points a metre apart (Rn / Jn), never raw indices.
 - **Outfit meshes** (round 11): the lab's outfits came with parts wound inside out (270 of 408 meshes);
   Tools/art/check_outfit_winding.py checks them (WR_FIX=1 turns them). Run it on any outfit mesh brought in. Trim (vertex
   colour R) blends by the base materials' TrimAmount (0.4, Tools/art/fix_outfit_trim.py); per-material looks in

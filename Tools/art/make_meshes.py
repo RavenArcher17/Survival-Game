@@ -17,7 +17,12 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
                           (cloth) as an instanced block (WRBuildLook EWRLookMesh::Tent).
   SM_IceArch_A            a natural ice bridge 72 m across, 13 m high, icicles under it (the Ice Arch); collides.
   SM_Pingo_A              an ice-cored mound 26 m across, 10.5 m high, a cracked crown, one flank broken open.
-  SM_IceBlock_A..C        a block of glacier ice 4 m each way, top broken at a slant, faces split (the Crevasse Maze).
+  SM_IceBlock_A..C        a block of glacier ice 4 m each way, top broken at a slant, faces split (ice fallen into the
+                          Crevasse Maze's crevasses).
+  SM_CrevasseRow_0..5      the Crevasse Maze's six rows (round 12): glacier ice 41 m long, fluted walls battered out with
+                          depth; past the crevasses' ends the rows join in one slope; _0 / _5 with the glacier's slope
+                          rising to them on -X / +X (the outer rows). SM_CrevasseFill_A: the drift filling a crevasse's
+                          end. SM_SnowBridge_A..B / SM_IceBridge_A: the arches across its crevasses.
   SM_Hornito_A..B         a lava chimney of welded spatter, 20 m tall, an open throat (the Bellows Stacks, hornitos).
   The last places (round 4), drawn by FWRIsleSite::Shape / ShapeMat / ShapeKit:
   SM_GiantSkull_A, _Jaw_A the Fallen Smith's skull (5.6 m: braincase, brow, cheekbones, the sockets and the nose's opening
@@ -52,6 +57,7 @@ Run: UnrealEditor-Cmd Wildreach.uproject -run=pythonscript -script="<full path>/
 Materials are set where they're used (the dressing's M_Rock / M_IceBlock / M_Obsidian, world-space projected, so the
 meshes need no UVs to speak of).
 """
+import bisect
 import math
 import os
 import random
@@ -1645,6 +1651,195 @@ def shoe(name, seed):
     save(mesh, name, nanite=True)
 
 
+def loft(raw, rings, centres, axis):
+    """Quads between rings of points laid one after another along an axis (0 x, 1 y), each ring a closed loop, the
+    two end rings capped; each face turned away from its own ring's centre (centres: one point per ring, rising
+    along the axis)."""
+    ids = [[raw.pt(p) for p in ring] for ring in rings]
+    keys = [c[axis] for c in centres]
+
+    def out_of(c):
+        k = min(max(bisect.bisect_left(keys, c[axis]), 0), len(keys) - 1)
+        if k > 0 and abs(keys[k - 1] - c[axis]) < abs(keys[k] - c[axis]):
+            k -= 1
+        o = [c[m] - centres[k][m] for m in range(3)]
+        o[axis] = 0.0
+        return tuple(o)
+    raw.grid(ids, out_of)
+    d = [0.0, 0.0, 0.0]
+    d[axis] = -1.0
+    raw.fan(ids[0], centres[0], tuple(d))
+    d[axis] = 1.0
+    raw.fan(ids[-1], centres[-1], tuple(d))
+
+
+def crevasse_row(name, seed, xoff, apron=0):
+    """One row of glacier ice between two of the Crevasse Maze's crevasses (round 12: the rows were separate cubes,
+    dice and sugar lumps from the air; then one level slab each, 15 m tall at the foot of the slope; then rows whose
+    ends sloped down apart, standing in a line like loaves and tents). Built in the field's own frame, the slope's plane
+    (the maze tilts it to the ground): 41 m along Y at full height, 4 m across its top (X), 4 m tall; its walls fluted
+    top to bottom, stepped back where each layer ends, broken into planes every 2-3.5 m, battered out with depth (a
+    crevasse is a V, narrower at its floor), the lip rounded over, here and there a cornice of snow leaning out; the top
+    crowned under its snow. Over the crevasse's last 6 m the row widens, so the crevasse narrows to a slit 1.6 m wide
+    at its end (lens-shaped from the air; cut square, the ends read as a grid). Past each end of a crevasse it spreads to 9 m (over its neighbours' by 30 cm), so the
+    rows join into one surface there that falls away as the glacier's slope, about 15 degrees, rounding over and
+    scalloped by the wind (the crevasse's end filled by a drift: crevasse_fill). apron -1 / +1: that side is no wall but
+    the same slope (the field's outer rows). One mesh per row (xoff: its place across the field, 8.4 m apart): past the
+    ends the surface is the field's, the same in every row, so neighbours meet without a seam (each one's 30 cm over
+    dipped under the other's). Origin on the ground line at the row's middle; it runs 3 m under it."""
+    rnd = random.Random(seed)
+    raw = Raw()
+    HT, HW, LB, Z0, DA, HE = 400.0, 200.0, 2050.0, -300.0, 2600.0, 450.0
+    NWALL, NTOP = 30, 14
+    sides = {}
+    for sgn in (-1.0, 1.0):
+        waves = [(rnd.uniform(60.0, 210.0), rnd.uniform(0, 2 * math.pi), rnd.uniform(0.5, 1.0)) for _ in range(4)]
+        bands = sorted(rnd.uniform(-120.0, 330.0) for _ in range(rnd.randint(3, 6)))
+        knots, y = [], -LB - 300.0
+        while y < LB + 300.0:
+            knots.append((y, rnd.uniform(-22.0, 22.0)))
+            y += rnd.uniform(200.0, 350.0)
+        knots.append((y, rnd.uniform(-22.0, 22.0)))
+        sides[sgn] = (waves, sum(w[2] for w in waves), bands, knots, rnd.random() < 0.5)
+
+    def facet(knots, y):
+        for k in range(1, len(knots)):
+            if knots[k][0] >= y:
+                (ya, a), (yb, b) = knots[k - 1], knots[k]
+                return a + (b - a) * (y - ya) / (yb - ya)
+        return knots[-1][1]
+
+    def slope(zt, d, u, v):
+        """The glacier's surface d cm out from a lip at zt (u, v: the field's x, y, for the wind's scallops: the same
+        in every row)."""
+        z = zt - 0.27 * (d - 260.0 * (1.0 - math.exp(-d / 260.0)))
+        return z + (12.0 * fbm(u / 150.0, v / 220.0, 0.2, 2111, 2) + 4.0 * fbm(u / 40.0, v / 60.0, 0.6, 2114, 2)) * smooth(40.0, 300.0, d)
+
+    def side(sgn, y, zt, end, zl):
+        """The points up one side, from its foot (Z0) to its lip (z = zt); end: past the crevasse's end (a plain wall
+        at HE, inside the neighbour's spread). An apron falls away from zl (its lip's height: past the ends, already
+        down the end's slope)."""
+        waves, wsum, bands, knots, corn = sides[sgn]
+        pts = []
+        if apron == sgn:
+            for k in range(NWALL + 1):
+                d = DA * (1.0 - k / NWALL) ** 1.6
+                pts.append((sgn * (HW + d), max(slope(zl, d, xoff + sgn * (HW + d), y), Z0) if k else Z0))
+            return pts
+        for k in range(NWALL + 1):
+            v = k / NWALL
+            z = Z0 + (zt - Z0) * (1.0 - (1.0 - v) ** 1.5)
+            if end:
+                pts.append((sgn * HE, z))
+                continue
+            hw = HW + 140.0 * smooth(LB - 600.0, LB, abs(y)) + (zt - z) * 0.16
+            rib = sum(a * (1.0 - abs(math.sin(2 * math.pi * y / lam + ph + 0.7 * fbm(z / 300.0, y / 400.0, 0.1, seed + 3, 2)))) ** 1.6 for lam, ph, a in waves) / wsum
+            hw -= 24.0 * rib
+            hw -= sum(11.0 * smooth(b - 7.0, b + 7.0, z) for b in bands)
+            hw += facet(knots, y)
+            hw += 9.0 * fbm(y / 70.0, z / 70.0, 0.3, seed + 5, 3) + 3.0 * fbm(y / 16.0, z / 16.0, 0.8, seed + 6, 2)
+            r = max(0.0, 1.0 - (zt - z) / 50.0)
+            hw -= 30.0 * r * r
+            if corn:
+                hw += 70.0 * max(0.0, fbm(y / 300.0, 1.7, 0.4, seed + 7, 2)) * math.exp(-((z - (zt - 40.0)) / 35.0) ** 2)
+            pts.append((sgn * hw, z))
+        return pts
+
+    ys = [-LB - DA + 30.0 * i for i in range(int(DA / 30.0) + 1)]
+    ys = ys + [-LB + 30.0 * i for i in range(int(2 * LB / 30.0) + 1)] + [LB + 15.0 + 30.0 * i for i in range(int((DA - 15.0) / 30.0) + 1)]
+    ys = sorted(set(round(y, 3) for y in ys if -LB - DA <= y <= LB + DA))
+    rings, centres = [], []
+    for y in ys:
+        end = abs(y) > LB + 1.0
+        d = abs(y) - LB if end else 0.0
+        # (its own waves along the top fade out toward the ends, where the rows meet)
+        near = smooth(LB, LB - 400.0, abs(y))
+        zt = HT + 8.0 * fbm(y / 420.0, 0.3, 0.1, seed, 2) * near
+        zl = slope(zt, d, xoff + apron * HW, y) if end else zt
+        right, left = side(1.0, y, zt, end, zl), side(-1.0, y, zt, end, zl)
+        xr, xl = right[-1][0], left[-1][0]
+        top = []
+        for j in range(1, NTOP):
+            u = j / NTOP
+            x = xr + (xl - xr) * u
+            w = 2.0 * u - 1.0
+            if end:
+                top.append((x, slope(zt, d, xoff + x, y) - 3.0 * smooth(420.0, 450.0, abs(x))))
+            else:
+                top.append((x, zt + (16.0 * (1.0 - w * w) + 4.0 * fbm(x / 70.0, y / 70.0, 0.7, seed + 9, 2)) * near))
+        if end:
+            # the sides past the end: their tops on the slope too (dipped where they lie under the neighbour's)
+            ze = slope(zt, d, xoff + xr, y) - 3.0
+            right = [(p[0], min(p[1], ze)) for p in right[:-1]] + [(xr, ze)] if apron != 1.0 else right
+            ze = slope(zt, d, xoff + xl, y) - 3.0
+            left = [(p[0], min(p[1], ze)) for p in left[:-1]] + [(xl, ze)] if apron != -1.0 else left
+        loop = right + top + list(reversed(left))
+        rings.append([(p[0], y, p[1]) for p in loop])
+        centres.append((sum(p[0] for p in loop) / len(loop), y, sum(p[1] for p in loop) / len(loop)))
+    loft(raw, rings, centres, 1)
+    save(raw.mesh(), name)
+
+
+def crevasse_fill(name, seed):
+    """Snow drifted into the end of one of the Crevasse Maze's crevasses: a ramp 8 m long rising from the floor to the
+    rows' tops at the crevasse's end wall (+Y), its surface hollowed a little between the walls, 4.8 m across its top
+    (its sides into the walls), narrowing down the V. Origin on the floor's line at the end wall; the ramp runs back
+    along -Y. It's how you climb out when a snow bridge drops you in."""
+    raw = Raw()
+    L, NS, NT = 800.0, 43, 11
+    rings, centres = [], []
+    for i in range(NS):
+        y = -L + (L + 40.0) * i / (NS - 1)
+        u = min(1.0, max(0.0, (y + L) / L))
+        zt = -20.0 + 420.0 * (0.5 * u + 0.5 * u * u)
+        top = []
+        for j in range(NT + 1):
+            w = 1.0 - 2.0 * j / NT
+            x = 240.0 * w
+            top.append((x, zt - 12.0 * (1.0 - w * w) + 6.0 * fbm(x / 60.0, y / 60.0, 0.3, seed, 2)))
+        right = [(180.0 + 60.0 * k / 4.0, -100.0 + (zt + 100.0) * k / 4.0) for k in range(4)]
+        left = [(-180.0 - 60.0 * k / 4.0, -100.0 + (zt + 100.0) * k / 4.0) for k in range(4)]
+        loop = right + top + list(reversed(left))
+        rings.append([(p[0], y, p[1]) for p in loop])
+        centres.append((0.0, y, (zt - 100.0) / 2.0))
+    loft(raw, rings, centres, 1)
+    save(raw.mesh(), name)
+
+
+def snow_bridge(name, seed, ice=False):
+    """A crossing over one of the Crevasse Maze's crevasses (round 12: a slab and two balls, a pill laid across the
+    gap): an arch 6 m long (X) and 2.4 m wide in the middle, 4 m at its ends, its top sagging a little, thin in the middle and thickening to haunches
+    that flow down the crevasse's walls at either end, its underside rounded and lumpy. Snow (a wind-packed snow
+    bridge, that drops) or, ice, an old bridge of blue ice twice as thick (the safe line's). Origin at its top's middle
+    at the ends' height; its ends run 80 cm onto the rows either side."""
+    raw = Raw()
+    L, NX, NR = 300.0, 41, 28
+    rings, centres = [], []
+    for i in range(NX):
+        x = -L + 2 * L * i / (NX - 1)
+        a = abs(x) / L
+        sag = (5.0 if ice else 9.0) * (1.0 - min(1.0, abs(x) / 220.0) ** 2)
+        thk = (70.0 if ice else 32.0) + 150.0 * smooth(0.45, 1.0, a)
+        # (snow: pinched in its middle and spreading along the lips where it's frozen on; laid straight across, a row
+        # of white bars read as a lattice from the air)
+        hw = (150.0 if ice else 118.0) + 10.0 * fbm(x / 90.0, 0.2, 0.1, seed, 2) + (22.0 if ice else 80.0) * smooth(0.5, 1.0, a)
+        ring = []
+        for j in range(NR):
+            th = 2 * math.pi * j / NR
+            c, sn = math.cos(th), math.sin(th)
+            zu = math.copysign(abs(sn) ** 0.4, sn)
+            y = hw * math.copysign(abs(c) ** 0.4, c) * (0.84 + 0.16 * (zu + 1.0) / 2.0)
+            z = -sag - thk * (1.0 - zu) / 2.0
+            if zu < 0.6:
+                z += 7.0 * fbm(x / 45.0, y / 45.0, 0.4, seed + 2, 2) * (0.6 - zu)
+                y *= 1.0 + 0.05 * fbm(x / 60.0, z / 40.0, 0.9, seed + 3, 2)
+            ring.append((x, y, z))
+        rings.append(ring)
+        centres.append((x, 0.0, -sag - thk / 2.0))
+    loft(raw, rings, centres, 0)
+    save(raw.mesh(), name)
+
+
 def run(key, fn, *args):
     if want(key):
         try:
@@ -1712,6 +1907,12 @@ for i, n in enumerate("ABC"):
 run("townprops", awning, "SM_Awning_A", 1901)
 run("townprops", haystack, "SM_Haystack_A", 1902)
 run("shoe", shoe, "SM_Shoe_A", 2001)
+for i in range(6):
+    run("crevasse", crevasse_row, "SM_CrevasseRow_" + str(i), 2101 + i, -2100.0 + 840.0 * i, -1 if i == 0 else 1 if i == 5 else 0)
+run("crevasse", snow_bridge, "SM_SnowBridge_A", 2111)
+run("crevasse", snow_bridge, "SM_SnowBridge_B", 2112)
+run("crevasse", snow_bridge, "SM_IceBridge_A", 2113, True)
+run("crevasse", crevasse_fill, "SM_CrevasseFill_A", 2121)
 run("townprops", rowboat, "SM_Rowboat_A", 1903)
 for i, n in enumerate("AB"):
     run("crops", crop, "SM_WheatClump_" + n, 1801 + i, "wheat")

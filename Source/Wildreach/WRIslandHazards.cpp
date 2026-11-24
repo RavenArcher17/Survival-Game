@@ -300,10 +300,15 @@ void UWRIslandPlaces::StepServer(float Dt)
 			bool bOn = false, bInside = false;
 			for (AWRCharacterBase* C : Bodies)
 			{
-				const FVector L = BT.InverseTransformPosition(HzFeet(C));
-				if (FMath::Abs(L.X) > H.Half.X + 20.f || FMath::Abs(L.Y) > H.Half.Y + 20.f) continue;
+				// Over its footprint: the column straight down from it, whatever its tilt (the Crevasse Maze's bridges
+				// lie on a 24 degree slope: their own frame's column leaned off whoever fell in, and the bridge grew back
+				// over them).
+				const FVector Feet = HzFeet(C);
+				const FVector Over = BT.InverseTransformPosition(FVector(Feet.X, Feet.Y, H.At.Z));
+				if (FMath::Abs(Over.X) > H.Half.X + 20.f || FMath::Abs(Over.Y) > H.Half.Y + 20.f) continue;
+				const FVector L = BT.InverseTransformPosition(Feet);
 				if (L.Z > H.Half.Z - 40.f && L.Z < H.Half.Z + 120.f) bOn = true;
-				if (L.Z > -H.Half.Z - 600.f && L.Z < H.Half.Z + 120.f) bInside = true;
+				if (Feet.Z > H.At.Z - H.Half.Z - 600.f && L.Z < H.Half.Z + 120.f) bInside = true;
 			}
 			if (H.State == 0 && bOn)
 			{
