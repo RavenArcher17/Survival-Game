@@ -6,12 +6,13 @@
 FWRTrailLook FWRTrailLook::Ash()
 {
 	FWRTrailLook L;
-	// (at 58, 52, 48 the paths read from the air as dark spokes drawn on the ash)
-	L.Colour = FLinearColor(FColor(76, 70, 64));
-	const float Mix[6] = { 0.f, 0.f, 0.55f, 0.f, 0.3f, 0.15f };
+	// (at 58, 52, 48 the paths read from the air as dark spokes drawn on the ash; round 14, the ash greyed to 74, 80, 94:
+	// brown on it they still drew lines. Packed ash, its own grey a shade under, the soil's grain in it)
+	L.Colour = FLinearColor(FColor(68, 72, 82));
+	const float Mix[6] = { 0.f, 0.f, 0.45f, 0.f, 0.4f, 0.15f };
 	for (int32 k = 0; k < 6; ++k) L.Layers[k] = Mix[k];
 	L.Rough = 0.92f;
-	L.Strength = 0.8f;
+	L.Strength = 0.65f;
 	return L;
 }
 

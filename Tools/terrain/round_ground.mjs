@@ -201,9 +201,12 @@ function landV(x, y, c) {
 	// V2 the Lava Fields: overlapping flow sheets, each ending in a steep front a few metres high (elongated down the
 	// slope, west to the sea), with tumuli (pressure blisters) on them.
 	const wx = x + 140 * fbm(x / 300, y / 300, s + 20, 2), wy = y + 140 * fbm(x / 300, y / 300, s + 25, 2);
-	const F = fbm(wx / 460, wy / 250, s + 21, 3);
-	let lobes = 0;
-	for (const t of [-0.3, -0.12, 0.06, 0.24]) lobes += smooth(t - 0.007, t + 0.007, F);
+	// (round 14: each front one smooth contour, a constant 7 m riser: from the ground a dam wall across the land. Now
+	// lobed (toes 30-60 m across pushed out of it) and its height wandering 2.5-10 m along it, lower where it thins)
+	const F = fbm(wx / 460, wy / 250, s + 21, 3) + 0.035 * fbm(x / 45, y / 45, s + 28, 2);
+	let lobes = 0, ti = 0;
+	// (each sheet its own thickness along it, 0.5-1.35 of 7 m, on a noise of its own: together they don't heap up)
+	for (const t of [-0.3, -0.12, 0.06, 0.24]) lobes += smooth(t - 0.007, t + 0.007, F) * (0.5 + 0.85 * smooth(-0.45, 0.45, fbm(x / 130, y / 130, s + 29 + 3 * ti++, 2)));
 	const tum = 2.6 * Math.pow(Math.max(0, fbm(x / 34, y / 34, s + 22, 2) - 0.18) / 0.82, 1.3);
 	const flow = 7 * lobes + 1.6 * tum + 5 * fbm(x / 400, y / 400, s + 3, 3);
 	// V3 the Obsidian Ridges: tall, sharp-crested ridges with glassy faces, smaller blades between them.
@@ -213,8 +216,11 @@ function landV(x, y, c) {
 	const mounds = 8 * Math.pow(Math.max(0, fbm(x / 46, y / 46, s + 24, 2) - 0.16) / 0.84, 1.1);
 	const solf = -32 * smooth(0.15, 0.85, zw[2]) + mounds + 5 * fbm(x / 350, y / 350, s + 6, 3) - 1.5 * smooth(-0.42, -0.5, fbm(x / 60, y / 60, s + 27, 2));
 	// V6 the Cinder Terraces: broad steps down toward the meadow, each with a crisp riser.
-	const v = (fbm(x / 1100, y / 1100, s + 8, 3) + 1) * 2.5 + o.beyond / 500, vf = v - Math.floor(v);
-	const terraces = 16 * (Math.floor(v) + smooth(0.46, 0.54, vf)) - 16 * o.beyond / 500 + 4 * fbm(x / 160, y / 160, s + 9, 2);
+	// (round 14: their risers ran on in long even lines; now lobed a little, and each riser's top broken back in
+	// places, slumped)
+	const v = (fbm(x / 1100, y / 1100, s + 8, 3) + 1) * 2.5 + o.beyond / 500 + 0.05 * fbm(x / 60, y / 60, s + 43, 2), vf = v - Math.floor(v);
+	const slump = 0.02 + 0.05 * smooth(-0.2, 0.5, fbm(x / 110, y / 110, s + 44, 2));
+	const terraces = 16 * (Math.floor(v) + smooth(0.5 - slump, 0.5 + slump, vf)) - 16 * o.beyond / 500 + 4 * fbm(x / 160, y / 160, s + 9, 2);
 	// V7 the Ashfall Woods: an old forest smothered by a fall of ash: soft drifted swells, hummocks over fallen trunks.
 	const woods = 6 * fbm(x / 340, y / 340, s + 40, 3) + 1.3 * Math.abs(fbm(x / 40, y / 40, s + 41, 2)) + 1.6 * Math.max(0, 1 - Math.abs(fbm(x / 90, y / 160, s + 42, 2)) * 9);
 	let h = base + wc * ash + w2 * flow + w3 * ridges + w4 * solf + w5 * 5 * fbm(x / 300, y / 300, s + 10, 3) + w6 * terraces + w7 * woods;
@@ -581,6 +587,13 @@ for (let j = 0; j < N; j++) for (let i = 0; i < N; i++) {
 		// (and never across the bare rock: white chevrons on it)
 		else if ((z === "T1" || z === "T6") && S[k] !== SURF.lichen_rock && polyEdge(x, y, 26, 401) < 0.4 && fbm(x / 240, y / 240, 1068 + 33, 2) > 0.2 && Math.hypot(x, y) - meadowAt(bearingOf(x, y)) > 140) S[k] = S[k] === SURF.thaw_moss ? SURF.moss_crack : SURF.snow_crack;
 		if (z === "T4" && clearOf(x, y, 0) && (H[k] < sampleH(x + 8, y) - 2 || H[k] < sampleH(x - 8, y) - 2) && (H[k] < sampleH(x, y + 8) - 1 || H[k] < sampleH(x, y - 8) - 1)) S[k] = SURF.crevasse;
+		// (round 14) Along the meadow's edge a ragged band (15-55 m) is left to the zone's own ground, so the zones' 40 m
+		// blend carries the meadow's green into the Thaw and the Steppe: the moss and the steppe grass began right at
+		// the meadow's line, blended over 7 m, a hard line across the land from any height.
+		if ((z === "T6" || z === "T7") && S[k] !== SURF.lake_ice && S[k] !== SURF.shingle) {
+			const dm = Math.hypot(x, y) - meadowAt(bearingOf(x, y));
+			if (dm < 35 + 40 * fbm(x / 18, y / 18, 1068 + 81, 2)) S[k] = 0;
+		}
 	}
 }
 // The landforms content may stand on (vents on the cones, a den in a pingo, the tube mouth at the lava head).
@@ -671,6 +684,42 @@ for (const v of Object.values(FF.VILLAGES)) pad(v.at, 48, 90);   // a long, easy
 		}
 	}
 	log(`places levelled: ${n}`);
+}
+// Gullies down the steep rock (round 14): the Volcanic's ridges, cone flanks and risers and the Tundra's rock faces were
+// one smooth draped face each, a dam wall from the ground (panels laid over them read as brick walls, and no colour on
+// them carried: on near-black rock the exposure took it). Runnels ~26 m apart are carved down every face steeper than
+// 38 degrees, 1.5-4 m deep by how steep, their line wandering, fading out over its top and foot; clear of the places and
+// of the city, and never on ice (the Tundra's ice faces grow their own flutes, WRLandCaves). The heightfield's own
+// relief: lit and shadowed by the sun, no meshes.
+{
+	const H0 = Float32Array.from(H);
+	const placesAt = FFL.places.filter((p) => Array.isArray(p.at)).map((p) => p.at);
+	let carved = 0;
+	for (let j = 2; j < N - 2; j++) for (let i = 2; i < N - 2; i++) {
+		const k = j * N + i, x = -HALF + i * STEP, y = -HALF + j * STEP;
+		const own = LANDS[OWN[k]] && LANDS[OWN[k]].id;
+		if (own !== "volcanic" && own !== "tundra") continue;
+		if (H0[k] < 1) continue;
+		const gx = (H0[k + 1] - H0[k - 1]) / (2 * STEP), gy = (H0[k + N] - H0[k - N]) / (2 * STEP), gl = Math.hypot(gx, gy);
+		const slope = Math.atan(gl) * 180 / Math.PI;
+		if (slope < 34) continue;
+		if (own === "tundra" && FF.subZoneAt("tundra", [x, y]) !== "T1" && FF.subZoneAt("tundra", [x, y]) !== "T2" && FF.subZoneAt("tundra", [x, y]) !== "T7") {
+			// (the shelves, the plateau, the lakes, the Thaw: their steep ground is ice or snow)
+			continue;
+		}
+		if (placesAt.some(([px, py]) => Math.hypot(x - px, y - py) < 70)) continue;
+		if (Math.hypot(x, y) < CITY_WALL + 120) continue;
+		// across the face (along its contour) and down it
+		const tx = -gy / gl, ty = gx / gl, dx = gx / gl, dy = gy / gl;
+		const u = x * tx + y * ty, v = x * dx + y * dy;
+		// (at 13 m apart and 2 m deep the 4 m grid lost them: 26 m apart, up to 4 m deep, each gully ~10 m across)
+		const ph = u / 26 + 0.7 * fbm(v / 60, u / 120, 1068 + 91, 2) + 0.25 * fbm(x / 40, y / 40, 1068 + 92, 2);
+		const run = Math.pow(1 - Math.abs(Math.sin(Math.PI * ph)), 1.6);
+		const depth = (1.5 + 2.5 * smooth(38, 62, slope)) * smooth(34, 44, slope) * (0.65 + 0.35 * fbm(x / 90, y / 90, 1068 + 93, 2));
+		H[k] = H0[k] - depth * run;
+		carved++;
+	}
+	log(`gullies carved down ${carved} samples of steep rock`);
 }
 // The caves (11-20, Raven: "make them like real caves that go into the ground", then "Build them": caves worth
 // exploring): each a small network (cave_layout.mjs: an entry chamber, the big hall down a slope or off a ledge with a
@@ -1015,7 +1064,9 @@ const ZONES = [
 	{ id: "T3", letter: "i", name: "the Frozen Lakes", slopeRock: [150, 160, 172], ground: [222, 232, 240], groundAlt: [190, 214, 228], layers: { sand: 1 } },
 	{ id: "T4", letter: "j", name: "the Ice Shelves", slopeRock: [170, 196, 220], ground: [196, 218, 236], groundAlt: [176, 204, 228], layers: { sand: 0.8, stones: 0.2 } },
 	{ id: "T5", letter: "k", name: "the Glacier Plateau", slopeRock: [176, 200, 224], ground: [224, 234, 244], groundAlt: [206, 222, 238], layers: { sand: 0.9, stones: 0.1 } },
-	{ id: "T6", letter: "l", name: "the Thaw", slopeRock: [104, 102, 96], ground: [150, 156, 118], groundAlt: [226, 232, 236], layers: { moss: 0.5, sand: 0.3, grass: 0.2 } },
+	// (round 14: its own ground now shows in a band along the meadow, between the meadow's grass and the moss; it was pale,
+// with snow-white patches)
+{ id: "T6", letter: "l", name: "the Thaw", slopeRock: [104, 102, 96], ground: [100, 106, 66], groundAlt: [106, 104, 70], layers: { moss: 0.55, grass: 0.25, soil: 0.2 } },
 	{ id: "T7", letter: "n", name: "the Mammoth Steppe", slopeRock: [120, 110, 92], ground: [166, 148, 100], groundAlt: [150, 136, 96], layers: { grass: 0.7, soil: 0.3 } },
 	{ id: "meadow", letter: "M", name: "Hearthmoot's meadow", ground: [92, 132, 62], groundAlt: [106, 140, 67], layers: { grass: 0.93, soil: 0.07 } },
 	{ id: "city", letter: "C", name: "Hearthmoot's walls", ground: [92, 130, 62], groundAlt: [104, 137, 65], layers: { grass: 0.9, soil: 0.1 } },

@@ -1049,6 +1049,11 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Cuts in the land** (round 14): a land chunk hangs a 0.9 m skirt round every cut square (a cave's mouth, the
   maze), and the caves' skin is dropped only where the land draws all round it two cells out: either alone left a
   hairline along a cut's edge.
+- **Steep rock** (round 14): round_ground.mjs carves gullies into the heightfield on every Volcanic and T1/T2/T7
+  sample steeper than 34-44 degrees (26 m apart, up to 4 m deep; not within 70 m of a place or near the city), before
+  the caves are laid. M_IslandGround's steep-rock bands and ribs multiply the FINAL colour (after the land's tint);
+  multiplied into the texture before it, they were clipped away (the tint takes only the texture's brightness, capped).
+  On dark ground the auto and local exposure even out broad colour changes: relief has to come from the ground's shape.
 - **Clear ice** (round 14): M_IslandGround draws ground whose own roughness is under ~0.2 after the soft blend (lake
   ice 0.06, the cirque's polished ice 0.08) as black ice: glossy, the textures' grain gone, cracks and bubbles at
   odd angles and sizes (at one square size they tiled into a grid from the air).

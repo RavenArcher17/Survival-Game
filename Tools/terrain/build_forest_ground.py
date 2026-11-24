@@ -266,7 +266,18 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         tw = unary(unreal.MaterialExpressionAbs, add(mul(fr, k=2.0), k=-1.0))
         # (0.8-1.2 was too faint to read from the ground; 0.62-1.4)
         layers_r = add(mul(sat(mul(add(tw, k=-0.35), k=3.0)), k=0.55), mul(fr2, k=0.23))
-        rock_c = mul(rock_c, add(layers_r, k=0.62))
+        # (applied to the final colour, below: on the texture here, the land's tint took only the texture's brightness
+        # clipped at 0.38, and the bands and joints all but vanished)
+        rock_mod = add(layers_r, k=0.62)
+        # (round 14, second go: 2.4 m columns on faces 60-90 m tall came out as fine noise from any distance. A cliff
+        # reads by its gullies: dark runnels down the face 10-15 m apart, ribs between them, streaks within; the
+        # horizontal bands held faint, so they don't stripe it like a dam)
+        along = lerp(wx, wy, side)
+        gully = mask(sample(var_r, append2(mul(along, k=1.0 / 1300.0), mul(wz, k=1.0 / 9000.0))), "r")
+        streak = mask(sample(var_r, append2(add(mul(along, k=1.0 / 330.0), const(0.37)), mul(wz, k=1.0 / 2600.0))), "b")
+        runnel = sat(mul(sub(const(0.55), gully), k=3.0))
+        ribs = mul(sub(const(1.0), mul(runnel, k=0.5)), add(mul(streak, k=0.35), k=0.82))
+        rock_mod = mul(lerp(const(1.0), rock_mod, const(0.45)), ribs)
     if strong_tint:
         # (round 7) steep ice stays ice: where the land's colour is bright (the ice shelves' and the glacier's faces,
         # WRLand slopeRock.ice) the snow and ice texture streaks down the face with half the rock's relief; drawn as rock,
@@ -309,6 +320,10 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
         albedo = lerp(mul(albedo, tint), mul(rgb, shade), amount)
         # (snow a shade under paper white: at full strength it blew out to flat white beside the meadow)
         albedo = mul(albedo, lerp(const(1.0), const(0.84), snowy))
+        # (round 14) the steep rock's bands and joints, on the final colour
+        # (the exposure takes most of a broad change on dark rock: these read close to, and the ground's own relief,
+        # round_ground.mjs's gullies, carries the faces from afar)
+        albedo = mul(albedo, lerp(const(1.0), rock_mod, mul(rock_w, ice_keep)))
     else:
         albedo = mul(albedo, tint)
 

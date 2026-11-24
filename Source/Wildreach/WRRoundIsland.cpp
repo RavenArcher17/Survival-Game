@@ -662,7 +662,10 @@ void AWRRoundIsland::StepCover()
 			// grass, 35 the Cinder Terraces' sparse grass, 44 the Thaw's sedge, 36 the kipuka's green.
 			// (A land's own grassy ground grows its grass wherever it lies: the zone grid's meadow letters reach up to 60 m
 			// over the meadow's edge in 16 m squares, and their meadow grass cut into the Thaw's sedge in steps.)
-			const int32 WildJ = SurfJ == 50 ? 0 : SurfJ == 35 ? 1 : SurfJ == 44 ? 2 : SurfJ == 36 ? 3 : -2;
+			int32 WildJ = SurfJ == 50 ? 0 : SurfJ == 35 ? 1 : SurfJ == 44 ? 2 : SurfJ == 36 ? 3 : -2;
+			// (round 14) the Thaw's and the Steppe's own zone ground (the band along the meadow's edge, round_ground.mjs)
+			// grows their grass too; it would have been a bare strip
+			if (WildJ == -2 && SurfJ == 0) WildJ = L == TEXT('l') ? 2 : L == TEXT('n') ? 0 : -2;
 			const int32 Wild = WildJ >= 0 ? WildJ : bMeadow ? -1 : -2;
 			if (Wild == -2) continue;
 			if (Wild >= 0)
@@ -710,6 +713,9 @@ void AWRRoundIsland::StepCover()
 			// (58: a road's verge, round 9: grass thinner there, trodden)
 			if (!bCrop && Surf != 58 && !bArea) continue;
 			if (Surf == 58 && n >= PerCell * 0.4f) continue;
+			// (round 14: 2, the lake's and the stream's bank, mud and trodden grass: the meadow's grass grew over it to the
+			// water, and the shore read as a lawn running into the lake; a few tufts there)
+			if (Surf == 2 && n >= PerCell * 0.2f) continue;
 			const FVector Root = D->ToWorld(M, D->Height(M) - 0.02f);
 			if (bCrop && CropMeshes.Num() == 6)
 			{
@@ -1055,6 +1061,13 @@ void AWRRoundIsland::BuildLava()
 	const float HeadSpread = T.Num(TEXT("roundIsland.lavaHeadSpread"), 6000.f);
 	// (a point a few metres back up its line, so the head's end closes round; then every 15 m, so the spread is smooth)
 	Pts.Insert(Pts[0] - (Pts[1] - Pts[0]).GetSafeNormal2D() * 300.f + FVector(0.f, 0.f, 20.f), 0);
+	// (round 14: its last point lies on the beach 3 m over the sea, and it ended there cut square, a slab of lava on the
+	// sand; it now runs on down the beach and under the water, the steam over it)
+	if (Pts.Num() >= 2 && Pts.Last().Z > -100.f)
+	{
+		const FVector Dir = (Pts.Last() - Pts[Pts.Num() - 2]).GetSafeNormal2D();
+		Pts.Add(Pts.Last() + Dir * 2500.f + FVector(0.f, 0.f, -float(Pts.Last().Z) - 250.f));
+	}
 	{
 		TArray<FVector> Dense;
 		for (int32 i = 0; i + 1 < Pts.Num(); ++i)

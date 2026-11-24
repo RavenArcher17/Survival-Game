@@ -55,6 +55,20 @@ spots) and the Volcanic (34), and everything they turned up.
   city's yards were bare cubes: now boards with a batten up each corner and round the top and foot. Each crossroads'
   waymark was two blocks of coursed wall stone on a ring of them, a black chimney stack: now a grey field stone with
   lichen, tapering and leaning, on a cairn of rounded stones.
+- **Gullies down the steep rock:** the Volcanic's ridges, cone flanks and risers and the Tundra's rock faces were each
+  one smooth draped face, a dam wall from the ground. Runnels about 26 m apart, 1.5-4 m deep by how steep, are now
+  carved into the ground itself down every face over 38 degrees (not near the places or the city, never on ice).
+  It's the ground's own relief, so low sun picks the faces out; no meshes, no memory. (Colour alone couldn't do it:
+  on near-black rock the exposure evens it out.)
+- **Lava fronts and terraces:** each lava field's flow front was one smooth contour with a 7 m riser, a dam wall
+  across the land: now lobed, its height wandering 3.5-9.5 m along it. The Cinder Terraces' risers are lobed and
+  slumped in places.
+- **The lava river meets the sea:** it ended on the beach 3 m over the water, cut square; it now runs down into the
+  sea under its steam.
+- **The meadow's edge with the Thaw and the Steppe:** the moss and the steppe grass began right at the meadow's line,
+  a hard line across the land; a ragged band 15-55 m wide of each zone's own ground now blends them, with its grass.
+- **The lake's bank** grows a few tufts instead of the meadow's grass to the water.
+- **Emberwick's paths** are packed grey ash (brown, they still drew lines on the greyed ash).
 - **Memory:** the ice walls cost about 2.3 GB on a client and 1.6 GB on the server (measured in the editor's game);
   each cube of cave or wall now keeps only the vertices it draws.
 - **Checked:** the round-island tests pass (0 failed; the city 17.3 ms a frame, the meadow 9.8 ms). The Tundra's
