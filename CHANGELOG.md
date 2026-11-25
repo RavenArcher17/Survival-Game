@@ -36,7 +36,9 @@ spots) and the Volcanic (34), and everything they turned up.
   out clear of the others.
 - **The Pale Hunter's pines** were straight white rods with pencil stubs, a ring of telephone poles: now snags that
   bend and taper, roots flared, thick broken stubs and a few long dead limbs, the tops splintered or fallen beside them.
-- **Berry bushes** in the Tundra are frosted over, the berries showing red through it.
+- **Berry bushes:** their berries were 3-4 cm specks you couldn't find from a few metres; now a size you can see. (The
+  bush stays green in the Tundra: frosting it was tried, and the shrub pack's coat doesn't reach its leaves; a green
+  bush on the snow is easy to spot anyway.)
 - **The Volcanic's cliffs:** rock panels laid close up every ridge, terrace and lava front read as brick walls. They're
   gone; its steep ground (and the Tundra's rock) draws layered rock, flows laid one on another in bands lighter and
   darker, in the ground's own material. (Growing the

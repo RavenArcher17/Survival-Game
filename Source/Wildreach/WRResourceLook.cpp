@@ -5,7 +5,6 @@
 #include "WRDesertTypes.h"
 #include "WRForestTypes.h"
 #include "WRTreeKit.h"
-#include "WRLand.h"
 #include "WRResourceNode.h"
 #include "WRTuning.h"
 #include "Components/InstancedStaticMeshComponent.h"
@@ -604,18 +603,15 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 		const float BushH = 260.f, LeafH = BushH * 0.45f;
 		Place(Fit(Main, FVector(0.f, 0.f, BushH), 8.f));
 		Look->SetCastShadow(false);  // like the island's shrubs: wind-blown leaf cards in the shadow maps cost far more than they show
-		// In the Tundra frosted over, the berries showing red through it (round 14: a summer-green bush stood on the snow).
-		// (the zone's own biome: the round island is one land, its biome not the Tundra's)
-		const FWRLandDef* Land = WRLand::At(Node->GetActorLocation());
-		const bool bFrost = Land && Land->BiomeAtMap(Land->ToMap(Node->GetActorLocation())) == TEXT("tundra");
+		// (round 14: frosting it in the Tundra was tried; the shrub pack's coat and colour don't reach these leaves, and a
+		// green bush on the snow is what you look for anyway)
 		for (int32 Slot = 0; Slot < Look->GetNumMaterials(); ++Slot)
 		{
 			if (UMaterialInstanceDynamic* MID = UMaterialInstanceDynamic::Create(Main->GetMaterial(Slot), Node))
 			{
-				// No "snow" coat elsewhere: a fresh green bush, the one green thing among the ashen shrubs, hung with berries.
-				MID->SetScalarParameterValue(TEXT("Amount Min"), bFrost ? 0.35f : 0.f);
-				MID->SetScalarParameterValue(TEXT("Amount Max"), bFrost ? 0.6f : 0.f);
-				if (bFrost) MID->SetVectorParameterValue(TEXT("Snow Color"), FLinearColor(0.9f, 0.94f, 1.f));
+				// No "snow" coat: a fresh green bush, the one green thing among the ashen shrubs, hung with berries.
+				MID->SetScalarParameterValue(TEXT("Amount Min"), 0.f);
+				MID->SetScalarParameterValue(TEXT("Amount Max"), 0.f);
 				Look->SetMaterial(Slot, MID);
 			}
 		}
@@ -632,7 +628,7 @@ void WRResourceLook::Apply(AWRResourceNode* Node, UStaticMeshComponent* Collider
 			const FVector C(FMath::Cos(A) * R, FMath::Sin(A) * R, LeafH * H - 8.f);
 			for (int32 b = 3 + Rand.RandHelper(4); b > 0; --b)
 			{
-				const float S = Rand.FRandRange(3.2f, 4.6f);
+				const float S = Rand.FRandRange(4.2f, 5.8f);   // (round 14: at 3.2-4.6 cm specks you couldn't find from a few metres)
 				Bit(C + FVector(Rand.FRandRange(-4.f, 4.f), Rand.FRandRange(-4.f, 4.f), Rand.FRandRange(-5.f, 2.f)), FRotator::ZeroRotator, FVector(S));
 			}
 		}
