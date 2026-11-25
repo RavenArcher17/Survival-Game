@@ -1,12 +1,12 @@
 // Hearthmoot and its meadow, the plan both builders share (plan phase 3, slice 1 quality pass, Raven 11-19: "go ahead
 // with what you recommend": a city that feels lived in, a meadow and lake that look natural). Pure shapes from the
 // signed-off layout (no heights): round_ground.mjs paints and flattens the ground from it (cobbled streets, grass yards,
-// fields, the beach, the bridges' channels); hearthmoot.mjs stands the buildings, plants and props on that ground.
+// fields, the beach); hearthmoot.mjs stands the buildings, plants and props on that ground.
 //   streets   the city's avenues (gate to plaza), the ring street, lanes, alleys and the lane inside the wall
 //   fields    strip fields in blocks beside each main road, a crop each; hedgerows round each block
 //   farms     a farmstead by each main road's fields; two windmills
 //   trees     the meadow's trees, in groves and alone (Poisson spacing, clear of everything else)
-//   reeds     clumps along the lake's shallows; beach (the city side of the lake), jetty, bridges (roads over the stream)
+//   reeds     clumps along the lake's shallows; beach (the city side of the lake), jetty, footbridge (over the stream)
 import * as RI from "./round_island.mjs";
 
 const { trunks, lands, stream, lakeOutline, lakeAt, meadowR, CITY_WALL, quarters, pt, bearingOf, norm, dAng, RAD, fbm, inPoly } = RI;
@@ -26,12 +26,6 @@ export function lineDist(p, pts) {
 	let best = { d: 1e9, at: pts[0], seg: 0 };
 	for (let i = 1; i < pts.length; i++) { const r = segDist(p, pts[i - 1], pts[i]); if (r.d < best.d) best = { d: r.d, at: r.at, seg: i - 1 }; }
 	return best;
-}
-function segCross(a, b, c, d) {
-	const r = [b[0] - a[0], b[1] - a[1]], s = [d[0] - c[0], d[1] - c[1]], den = r[0] * s[1] - r[1] * s[0];
-	if (Math.abs(den) < 1e-9) return null;
-	const t = ((c[0] - a[0]) * s[1] - (c[1] - a[1]) * s[0]) / den, u = ((c[0] - a[0]) * r[1] - (c[1] - a[1]) * r[0]) / den;
-	return t >= 0 && t <= 1 && u >= 0 && u <= 1 ? [a[0] + t * r[0], a[1] + t * r[1]] : null;
 }
 
 // ---- the city's streets ---------------------------------------------------------------------------------------------
@@ -83,19 +77,8 @@ export const reeds = (() => {
 	return o;
 })();
 
-// ---- the roads (the lands' own and the main roads) and where they cross the stream: a bridge each -----------------------
+// ---- the roads (the lands' own and the main roads) ------------------------------------------------------------------
 export const roads = [...lands.map((l) => ({ id: l.id, pts: l.road, half: 4 })), ...trunks.map((t) => ({ id: "main_" + t.lands.join("_"), pts: t.points, half: 6 }))];
-export const bridges = (() => {
-	const o = [];
-	for (const rd of roads) for (let i = 1; i < rd.pts.length; i++) for (let j = 1; j < stream.length; j++) {
-		const x = segCross(rd.pts[i - 1], rd.pts[i], stream[j - 1], stream[j]);
-		if (x && !o.some((b) => Math.hypot(b.at[0] - x[0], b.at[1] - x[1]) < 30)) {
-			const d = [rd.pts[i][0] - rd.pts[i - 1][0], rd.pts[i][1] - rd.pts[i - 1][1]], L = Math.hypot(...d);
-			o.push({ road: rd.id, at: x, dir: [d[0] / L, d[1] / L], half: rd.half });
-		}
-	}
-	return o;
-})();
 /** A footbridge where the stream leaves the lake (no road crosses it: the roads run beside it). */
 export const footbridge = (() => {
 	let i = 0, L = 0;
@@ -158,7 +141,6 @@ export const windmills = (() => {
 	return o;
 })();
 const inField = (p, pad = 0) => fields.some((f) => inPoly(p, f.poly)) || (pad > 0 && fieldBlocks.some((b) => lineDist(p, [...b.poly, b.poly[0]]).d < pad));
-export const fieldAt = (p) => fields.find((f) => inPoly(p, f.poly));
 
 // ---- the meadow's trees: groves and lone trees, Poisson-spaced, clear of roads, fields, water, farms and the city --------
 export const trees = (() => {

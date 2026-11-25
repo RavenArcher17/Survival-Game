@@ -705,7 +705,7 @@ namespace WRLandSitesImpl
 		// Five spans of 22 m across the ravine (local Y runs along the ravine; the viaduct runs along local X, west to
 		// east). The middle two are broken: their stones hang 2-8 m below the gap, turning slowly on keels. Their gaps
 		// (1.5-2.5 m) are the jump route across.
-		const float Span = 2200.f, Deck = 0.f;
+		const float Span = 2200.f;
 		const float DeckZ = FMath::Max(S.Gz(-5500.f, 0.f), S.Gz(5500.f, 0.f)) + 200.f;
 		for (int32 p = 0; p <= 5; ++p)
 		{

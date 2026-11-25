@@ -439,13 +439,10 @@ public:
 	UMaterialInterface* GroundMaterial() const;
 	/** What its ground chunks draw with (the land's instance, so rain wets anything else drawn with it too). */
 	UMaterialInterface* GroundLook() const;
-	UMaterialInterface* TearMaterial() const;
 	UMaterialInterface* LightMaterial() const;
 	void AddMover(const FWRLandMover& M) { Movers.Add(M); }
 	/** The server's clock as every machine reads it (movers and pulses are on it). */
 	double ServerTime() const;
-	/** The ground chunk under this point exists (its collision may still be cooking for a frame or two). */
-	bool IsGroundBuiltAt(const FVector& World) const;
 	/** Server, at load: a land's "camps" (PlayerStarts tagged for its path's biome, a safe zone each, the starter
 	 *  stations at one of them), only what the map doesn't already have. The ground is a function, so no wait. */
 	static void SpawnCamps(UWorld* World, const FWRLandDef& Def);

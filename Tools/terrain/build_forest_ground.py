@@ -235,7 +235,7 @@ def build_material(path="/Game/Terrain/M_ForestGround", strong_tint=False):
     # ---- snow and ice (the island's bright ground: its land colour over ~0.4) wear the snow's own texture and wind
     # ripples (11-22: they were the sand's, tinted white, and read as flat white with grey smudges)
     if strong_tint:
-        snow_c, snow_h, snow_n = pack("Snow", 350.0)
+        snow_c, _, snow_n = pack("Snow", 350.0)
         # and again at 11.3 m, turned (its 3.5 m repeat showed as a cell pattern across the snowfields from any height)
         uv_s2 = mul(append2(wy, mul(wx, k=-1.0)), k=1.0 / 1130.0)
         snow_c2, snow_n2 = sample(MW + "Snow_col", uv_s2), sample(MW + "Snow_nrm", uv_s2)

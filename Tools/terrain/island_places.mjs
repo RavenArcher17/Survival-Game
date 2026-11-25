@@ -200,24 +200,6 @@ const onRoad = (c, line, face) => {
 	}
 	return scan(bp[0], bp[1], 14, 3, (x, y) => standable(x, y, 8, 0.25) ? { score: -slope(x, y) * 10 - dist([x, y], bp) / 14, face } : null);
 };
-/** The longest straight, flat, dry run (300-420 m) starting near c: { from, to }. */
-const flatRun = (c, R) => {
-	let best = null;
-	for (let dx = -R; dx <= R; dx += 20) for (let dy = -R; dy <= R; dy += 20) {
-		const ax = c[0] + dx, ay = c[1] + dy;
-		if (dx * dx + dy * dy > R * R || !standable(ax, ay, 4, 0.14)) continue;
-		for (let a = 0; a < 360; a += 10) {
-			const ux = Math.cos(a * Math.PI / 180), uy = Math.sin(a * Math.PI / 180);
-			let L = 0;
-			for (let d = 10; d <= 420; d += 10) { const x = ax + ux * d, y = ay + uy * d; if (h(x, y) < 3 || isLava(x, y, 8) || slope(x, y) > 0.14 || !clearOf(x, y, curClear)) break; L = d; }
-			if (L < 300) continue;
-			const score = L - Math.hypot(dx, dy) / R * 60;
-			if (!best || score > best.score) best = { score, from: [round(ax), round(ay)], to: [round(ax + ux * L), round(ay + uy * L)] };
-		}
-	}
-	if (best) best.at = [round((best.from[0] + best.to[0]) / 2), round((best.from[1] + best.to[1]) / 2)];
-	return best;
-};
 /** A gentle apron under a steep face: uphill, the slope reaches 0.6+ within 40-120 m. Faces downhill. */
 const apron = (c, R) => scan(c[0], c[1], R, 8, (x, y) => {
 	if (!standable(x, y, 8, 0.3)) return null;

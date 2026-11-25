@@ -26,7 +26,6 @@ namespace WRIsleV
 		FSurf Ash = FSurf::Stone(Lin(110, 106, 102), 0.95f);
 		FSurf AshDark = FSurf::Stone(Lin(74, 70, 67), 0.95f);
 		FSurf Bone = FSurf::Stone(Lin(200, 192, 172), 0.7f);
-		FSurf BoneSoot = FSurf::Stone(Lin(132, 124, 110), 0.8f);
 		FSurf Rust = FSurf::Steel(Lin(138, 75, 42), 0.8f);
 		FSurf Iron = FSurf::Steel(Lin(42, 38, 36), 0.55f);
 		FSurf Glass = FSurf::Glass(Lin(13, 13, 16), 0.f);
@@ -979,15 +978,10 @@ bool WRIsleLook::BuildVolcanic(FWRIsleSite& S, const FString& Kind)
 
 namespace WRIsleLook
 {
-	/** The kit's hornito and cairn reuse the Volcanic's (WRIslandPlacesKit.cpp). */
+	/** The kit's hornito reuses the Volcanic's (WRIslandPlacesKit.cpp). */
 	void VolcanicHornito(FWRIsleSite& S, const FVector& Base, float H, float R)
 	{
 		const WRIsleV::FPal P;
 		WRIsleV::Hornito(S, P, Base, H, R, false);
-	}
-	void VolcanicWagon(FWRIsleSite& S, const FVector& At, float Yaw, bool bTipped, int32 Salt)
-	{
-		const WRIsleV::FPal P;
-		WRIsleV::Wagon(S, P, At, Yaw, bTipped, Salt);
 	}
 }

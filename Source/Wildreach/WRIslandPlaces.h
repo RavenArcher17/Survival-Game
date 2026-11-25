@@ -87,7 +87,6 @@ struct FWRIsleHazard
 	TSet<TWeakObjectPtr<AActor>> HitThisCycle;
 	uint8 State = 0;
 	double StateAt = 0.0;
-	double WeightSince = -1.0;
 	/** Client: the last tell / burst drawn, and the crack sounds already played. */
 	int64 DrawnTell = -1, DrawnBurst = -1;
 	int32 CracksPlayed = 0;
@@ -122,7 +121,6 @@ public:
 	static UWRIslandPlaces* Get(const UObject* WorldContext);
 
 	bool IsLive() const { return bLive; }
-	AWRIslandPlacesActor* GetOwnerActor() const { return Owner.Get(); }
 	AWRIsleState* GetState() const { return State.Get(); }
 	void SetState(AWRIsleState* InState) { State = InState; }
 	/** A hazard's replicated state changed (the server's own set, or a client's OnRep). */

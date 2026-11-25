@@ -973,22 +973,3 @@ bool WRIsleLook::BuildTundra(FWRIsleSite& S, const FString& Kind)
 {
 	return WRIsleT::BuildImpl(S, Kind);
 }
-
-namespace WRIsleLook
-{
-	void TundraSledge(FWRIsleSite& S, const FVector& At, float Yaw, int32 Salt, bool bLoad)
-	{
-		const WRIsleT::FPal P;
-		WRIsleT::Sledge(S, P, At, Yaw, Salt, bLoad);
-	}
-	void TundraDeadPine(FWRIsleSite& S, const FVector& G, float H, int32 Salt)
-	{
-		const WRIsleT::FPal P;
-		WRIsleT::DeadPine(S, P, G, H, Salt, false);
-	}
-	void TundraTusk(FWRIsleSite& S, const FVector& Base, const FVector& Ctrl, const FVector& Tip, float Thick)
-	{
-		const WRIsleT::FPal P;
-		WRIsleT::Tusk(S, P, Base, Ctrl, Tip, Thick);
-	}
-}

@@ -7,7 +7,7 @@
 // at the same (q, t) of its wedge. The Volcanic's depth is bent so Vulkarn's crater lands on the volcano of the cape
 // (round island layout), the Tundra's is near straight.
 //   node Tools/terrain/fire_frost.mjs   -> Tools/terrain/fire_frost_layout.json, Docs/design/fire_frost_map.svg
-// Exported for the ground (round_ground.mjs) and the content builders: toRound, fromRound, oldZoneAt, lavaAt, iceAt.
+// Exported for the ground (round_ground.mjs) and the content builders: toRound, fromRound, subZoneAt, beyondAt.
 import fs from "fs";
 import path from "path";
 import { fileURLToPath, pathToFileURL } from "url";
@@ -15,7 +15,7 @@ import * as RI from "./round_island.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const read = (p) => JSON.parse(fs.readFileSync(path.join(root, p), "utf8"));
-const { RAD, coastR, meadowR, byId, bearingOf, pt } = RI;
+const { RAD, coastR, byId, bearingOf, pt } = RI;
 
 // ---- the Old Island's coastline: on each 4 m row, the land run round x = 0 (its west and east coasts) -------------
 const SEA = read("Data/sea_mask.json");
@@ -110,10 +110,8 @@ export function oldZoneAt([x, y]) {
 	return null;
 }
 const cellSet = (arr) => { const s = new Set(); for (let i = 0; i + 2 < arr.length; i += 3) s.add(`${Math.round(arr[i] / 600)},${Math.round(arr[i + 1] / 600)}`); return s; };
-const LAVA = cellSet(DRESS.hazards.lava), ICE = cellSet(DRESS.hazards.ice);
+const ICE = cellSet(DRESS.hazards.ice);
 const inCells = (set, [x, y]) => set.has(`${Math.round(x * 100 / 600)},${Math.round(y * 100 / 600)}`);
-/** Is the round island point (m) on the moved lava flow / ice sheet? */
-export const iceAt = (XY) => { const o = fromRound("tundra", XY); return o.inside && o.beyond === 0 && inCells(ICE, o.at); };
 /** The Old Island point under a round island point, held inside its half. */
 export function oldUnder(id, XY) { const o = fromRound(id, XY); return [SIDE[id].side * Math.max(160, Math.abs(o.at[0])), o.at[1]]; }   // (the old zones stop 150 m short of the ridge, at its passes)
 /** The sub-zone at a round island point of the Volcanic or the Tundra: V1-V5 / T1-T5 where the Old Island's ground
@@ -249,9 +247,9 @@ if (MAIN) {
 			const c = [x + step / 2, y + step / 2];
 			if (!RI.inPoly(c, L.polygon)) continue;
 			const o = fromRound(id, c);
-			const z = subZoneAt(id, c), lava = false, ice = id === "tundra" && o.inside && inCells(ICE, o.at);
+			const z = subZoneAt(id, c), ice = id === "tundra" && o.inside && inCells(ICE, o.at);
 			const [px, py] = P([x, y]);
-			out.push(`<rect x='${px}' y='${py}' width='${(step * sc + 0.4).toFixed(1)}' height='${(step * sc + 0.4).toFixed(1)}' fill='${lava ? "#ff6a1a" : ice ? "#bfe6f5" : COL[z] || "#666"}'/>`);
+			out.push(`<rect x='${px}' y='${py}' width='${(step * sc + 0.4).toFixed(1)}' height='${(step * sc + 0.4).toFixed(1)}' fill='${ice ? "#bfe6f5" : COL[z] || "#666"}'/>`);
 		}
 		out.push(`<path d='M${L.polygon.map((p) => P(p).join(" ")).join(" L")} Z' fill='none' stroke='#000' stroke-width='1.2'/>`);
 		const lay = layout.lands[id];

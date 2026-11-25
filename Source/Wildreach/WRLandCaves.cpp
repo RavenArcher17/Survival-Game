@@ -166,26 +166,22 @@ namespace WRLandCavesImpl
 		bool Valid(int32 I, int32 J) const { return I >= 0 && J >= 0 && I < W && J < H; }
 	};
 	// (set on the game thread before any cube is queued; the workers only read them)
-	float GWallFrom = 40.f, GWallTo = 54.f, GRockFrom = 44.f, GRockTo = 58.f;
-	bool GWalls = true, GRockWalls = true;
+	float GWallFrom = 44.f, GWallTo = 56.f;
+	bool GWalls = true;
 	float LcWallFrom() { return GWallFrom; }
 	float LcWallTo() { return GWallTo; }
-	/** A sample's own wall weight (before the spread): steep ice of the Tundra; steep ground of the Volcanic (its cliffs,
-	 *  round 14: SM_Crag panels laid close read as brick walls up every ridge). */
+	/** A sample's own wall weight (before the spread): steep ice of the Tundra. (Round 14 grew the Volcanic's steep ground
+	 *  as rock walls the same way: 10,000 more cubes, +12 GB on a client, and little to see on its dark ridges. Its
+	 *  cliffs are carved gullies in the land and layered rock in the ground's material instead.) */
 	float LcWallWeight0(const FWRLandDef* L, int32 I, int32 J, float From, float To)
 	{
 		const uint8 Cls = L->HfSurfaceAt(I, J);
-		if (Cls == FWRLandDef::HfHidden) return 0.f;
-		const bool bIce = L->SlopeIceClasses.Contains(Cls);
-		if (!bIce && !GRockWalls) return 0.f;
+		if (Cls == FWRLandDef::HfHidden || !L->SlopeIceClasses.Contains(Cls)) return 0.f;
 		const float Gx = (L->HfSample(I + 1, J) - L->HfSample(I - 1, J)) / (2.f * L->HfStep);
 		const float Gy = (L->HfSample(I, J + 1) - L->HfSample(I, J - 1)) / (2.f * L->HfStep);
 		const float Slope = FMath::RadiansToDegrees(FMath::Atan(FMath::Sqrt(Gx * Gx + Gy * Gy)));
-		if (Slope < FMath::Min(From, GRockFrom)) return 0.f;
-		const FName Biome = L->BiomeAtMap(L->HfOrigin + FVector2D(float(I), float(J)) * L->HfStep);
-		if (Biome == TEXT("tundra")) return bIce ? LcSm(From, To, Slope) : 0.f;
-		if (Biome == TEXT("volcanic") && GRockWalls) return LcSm(GRockFrom, GRockTo, Slope);
-		return 0.f;
+		if (Slope < From) return 0.f;
+		return L->BiomeAtMap(L->HfOrigin + FVector2D(float(I), float(J)) * L->HfStep) == TEXT("tundra") ? LcSm(From, To, Slope) : 0.f;
 	}
 	/** The walls over a map box (metres). */
 	void LcBuildWalls(const FWRLandDef* L, const FVector2D& Lo, const FVector2D& Hi, FLcWalls& Out)
@@ -269,16 +265,6 @@ namespace WRLandCavesImpl
 	{
 		const float Step = LcSm(-0.2f, 0.2f, LcN2(P.Z / 460.f, (P.X + P.Y) / 3400.f));
 		return Wt * (70.f + 120.f * LcWallRib(P) - 30.f * Step + 16.f * LcN3(P / 85.f + FVector(2.f, 9.f, 4.f)));
-	}
-	/** The ground at a point's column, the walls pushed out over it (cm, world Z): the land's own where there's no wall. */
-	float LcWallGroundZ(const FWRLandDef* L, const FLcWalls& Wl, const FVector& P, float GroundZ)
-	{
-		FVector2f D;
-		const float Wt = LcWallAt(L, Wl, P.X, P.Y, D);
-		if (Wt <= 0.f) return GroundZ;
-		const float Push = LcWallPush(P, Wt);
-		// Taken from further into the wall (up its slope): the face moved out by Push.
-		return FMath::Max(GroundZ, LcGroundZ(L, P.X - D.X * Push, P.Y - D.Y * Push));
 	}
 	/** Every rock cube (S cm) the Tundra's walls reach: steep ice samples, a cube's height either side of each. */
 	void LcWallCubes(const FWRLandDef* L, float S, TSet<FIntVector>& Keys)
@@ -409,11 +395,6 @@ void AWRLandCaves::BeginPlay()
 		// (from 44 degrees: at 40 the walls took 2,400 cubes, 2.7 GB on a client; the faces worth growing are steeper)
 		GWallFrom = WRTune(TEXT("landCaves.wallFrom"), 44.f);
 		GWallTo = FMath::Max(GWallFrom + 1.f, WRTune(TEXT("landCaves.wallTo"), 56.f));
-		// The Volcanic's rock walls are off (landCaves.rockWalls 1 grows them): 10,000 more cubes, +12 GB on a client,
-		// and on its dark ridges they showed little; its steep ground draws its layered rock in the ground's material.
-		GRockWalls = GWalls && WRTune(TEXT("landCaves.rockWalls"), 0.f) > 0.f;
-		GRockFrom = WRTune(TEXT("landCaves.rockFrom"), 44.f);
-		GRockTo = FMath::Max(GRockFrom + 1.f, WRTune(TEXT("landCaves.rockTo"), 58.f));
 		if (GWalls) LcWallCubes(Land, S, WallKeys);
 		// and round each open crevasse field: its ground from 9 m under to 5 m over
 		for (const FWRLandCrevasses& F : Land->Crevasses)
@@ -775,34 +756,6 @@ void AWRLandCaves::ComputeCube(const FWRLandDef* L, const FIntVector& Key, float
 				RRough = FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(FMath::Lerp(0.78f, 0.36f, Glaze), 0.92f, OnFloor), 0.97f, Moss), 0.5f, Heat), 1.f - C.A, Lip);
 				U1 = FVector2D(Above, Water * (1.f - Lip));
 				U2 = FVector2D(Heat * (1.f - Lip), FMath::Clamp(Seam, -1.f, 1.f));
-				// A cliff out in the open (round 14): the land's own rock here (its zone's: black glass on the Obsidian
-				// Ridges, red scoria on the cones, grey basalt), mottled, darker down the runnels between its columns, ash
-				// lying on its ledges; no flow lines, no water.
-				const float K = LcSm(0.f, 0.3f, WallHere) * LcSm(150.f, 400.f, AirHere);
-				if (K > 0.f)
-				{
-					const float Rib = LcWallRib(P);
-					const float Ledge = LcSm(0.5f, 0.8f, Nrm.Z);
-					// (the ash on its ledges: the ground's own colour as it lies flat there)
-					FLinearColor Flat(0.f, 0.f, 0.f, 0.f);
-					for (int32 c = 0; c < 4; ++c)
-					{
-						const FIntPoint GS = LcGroundSample(L, I0 + (c & 1), J0 + (c >> 1));
-						float Rf = 0.9f;
-						Flat += L->HfGround(GS.X, GS.Y, FVector::UpVector, Rf) * (((c & 1) ? TX : 1.f - TX) * ((c >> 1) ? TY : 1.f - TY));
-					}
-					// (weathered faces lighter than the fresh rock in the runnels: at the rock's own colour, uniform and near
-					// black on the Obsidian Ridges, a cliff read as a dam)
-					const float Mottle = LcSm(-0.5f, 0.5f, LcN3(P / 190.f + FVector(2.f, 5.f, 8.f)));
-					FLinearColor WRc = C * (0.8f + 0.45f * Mottle) * (0.7f + 0.55f * Rib);
-					WRc = FMath::Lerp(WRc, FMath::Lerp(C, Flat, 0.6f) * 1.1f, LcSm(0.2f, 0.9f, LcN3(P / 400.f + FVector(9.f, 1.f, 4.f))) * 0.35f);
-					WRc = FMath::Lerp(WRc, Flat, Ledge);
-					WRc.A = 1.f;
-					Rc = FMath::Lerp(Rc, FMath::Lerp(WRc, C, Lip), K);
-					RRough = FMath::Lerp(RRough, FMath::Lerp(FMath::Lerp(1.f - C.A, 0.95f, Ledge), 1.f - C.A, Lip), K);
-					U1 *= 1.f - K;
-					U2 = FVector2D(U2.X * (1.f - K), U2.Y);
-				}
 			}
 			Out.RockColours.Add(FWRToolMesh::Pack(Rc, RRough));
 			Out.RockUV1.Add(U1);

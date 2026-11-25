@@ -1470,32 +1470,8 @@ void AWRRoundIsland::BuildWater()
 	}
 }
 
-void AWRRoundIsland::DebugLake(const TArray<FString>& Args)
-{
-	if (!Water || Args.Num() < 2) return;
-	if (Args[0] == TEXT("material"))
-	{
-		UMaterialInterface* Base = LoadObject<UMaterialInterface>(nullptr, *Args[1]);
-		if (!Base) { UE_LOG(LogWildreach, Warning, TEXT("LAKE no material %s"), *Args[1]); return; }
-		LakeMat = UMaterialInstanceDynamic::Create(Base, this);
-		LakeDay.Reset();
-		Water->SetMaterial(0, LakeMat);
-		UE_LOG(LogWildreach, Log, TEXT("LAKE material %s"), *Args[1]);
-		return;
-	}
-	if (!LakeMat) return;
-	// (a name may have spaces: "wr.Lake param Fresnel Power 0.5")
-	if (Args[0] == TEXT("param") && Args.Num() >= 3) LakeMat->SetScalarParameterValue(FName(*FString::Join(TArray<FString>(Args.GetData() + 1, Args.Num() - 2), TEXT(" "))), FCString::Atof(*Args.Last()));
-	else if (Args[0] == TEXT("colour") && Args.Num() >= 5) LakeMat->SetVectorParameterValue(FName(*Args[1]), FLinearColor(FColor(uint8(FCString::Atoi(*Args[2])), uint8(FCString::Atoi(*Args[3])), uint8(FCString::Atoi(*Args[4])))));
-	UE_LOG(LogWildreach, Log, TEXT("LAKE %s"), *FString::Join(Args, TEXT(" ")));
-}
-
 namespace WRRoundIslandImpl
 {
-	void LakeCommand(const TArray<FString>& Args, UWorld* World)
-	{
-		for (TActorIterator<AWRRoundIsland> It(World); It; ++It) It->DebugLake(Args);
-	}
 	/** Look checks: every thin, tall thing in the world (a column of light, a pole): wr.FindTall [minHeightM]. */
 	void FindTall(const TArray<FString>& Args, UWorld* World)
 	{
@@ -1570,8 +1546,6 @@ namespace WRRoundIslandImpl
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ActorCensus));
 	static FAutoConsoleCommandWithWorldAndArgs FarCmd(TEXT("wr.FarActors"), TEXT("Logs every actor farther than Km from the middle (wr.FarActors [km])."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FarActors));
-	static FAutoConsoleCommandWithWorldAndArgs LakeCmd(TEXT("wr.Lake"), TEXT("Look checks on the round island's lake: wr.Lake param Name Value | colour Name R G B | material Path."),
-		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&LakeCommand));
 	static FAutoConsoleCommandWithWorldAndArgs FindTallCmd(TEXT("wr.FindTall"), TEXT("Logs every thin, tall visible thing (wr.FindTall [min metres])."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FindTall));
 }

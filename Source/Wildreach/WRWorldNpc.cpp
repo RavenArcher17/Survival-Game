@@ -141,7 +141,7 @@ void AWRWorldNpc::BeginPlay()
 	{
 		// A crowd: plain faces, and only sent to players within peopleNetCull cm (the city's far side stays on the server).
 		bPlainFace = true;
-		NetCullDistanceSquared = FMath::Square(FWRTuning::Get().Num(TEXT("roundIsland.peopleNetCull"), 9000.f));
+		SetNetCullDistanceSquared(FMath::Square(FWRTuning::Get().Num(TEXT("roundIsland.peopleNetCull"), 9000.f)));
 	}
 	Super::BeginPlay();
 	GetCharacterMovement()->MaxWalkSpeed = NpcRole == TEXT("master") ? 160.f : WRWorld::Num(TEXT("caravan.speed"), 300.f);

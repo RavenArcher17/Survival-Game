@@ -1581,7 +1581,6 @@ AWRLand::AWRLand()
 
 UMaterialInterface* AWRLand::GroundMaterial() const { return GroundMat; }
 UMaterialInterface* AWRLand::GroundLook() const { return GroundMID ? static_cast<UMaterialInterface*>(GroundMID) : GroundMat.Get(); }
-UMaterialInterface* AWRLand::TearMaterial() const { return TearMat; }
 UMaterialInterface* AWRLand::LightMaterial() const { return LightMat; }
 
 double AWRLand::ServerTime() const
@@ -2293,27 +2292,6 @@ bool AWRLand::BuildLodChunk(const FIntPoint& Cell, int32 Level, bool bCollision,
 	Have.Level = int8(Level);
 	Have.bCollision = bCollision;
 	return true;
-}
-
-bool AWRLand::IsGroundBuiltAt(const FVector& World) const
-{
-	const FWRLandDef* D = Def();
-	if (!D) return false;
-	const FVector2D M = D->ToMap(World);
-	if (D->bHeightfield && D->bLod)
-	{
-		// Built means you can stand on it there (the far chunks are looks only).
-		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;
-		const FLodChunk* C = LodChunks.Find(FIntPoint(FMath::FloorToInt((M.X - D->HfOrigin.X) / Span), FMath::FloorToInt((M.Y - D->HfOrigin.Y) / Span)));
-		return C && C->bCollision;
-	}
-	if (D->bHeightfield)
-	{
-		const float Span = FMath::Max(1, FMath::RoundToInt(D->Chunk / D->HfStep)) * D->HfStep;
-		return BuiltCells.Contains(FIntPoint(FMath::FloorToInt((M.X - D->HfOrigin.X) / Span), FMath::FloorToInt((M.Y - D->HfOrigin.Y) / Span)));
-	}
-	const FVector2D Min = D->MapBox.Min - FVector2D(D->CoastSea);
-	return BuiltCells.Contains(FIntPoint(FMath::FloorToInt((M.X - Min.X) / D->Chunk), FMath::FloorToInt((M.Y - Min.Y) / D->Chunk)));
 }
 
 void AWRLand::StepWet(float DeltaSeconds)

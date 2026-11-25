@@ -91,13 +91,8 @@ namespace WRIsleLook
 	inline FLinearColor Lin(uint8 R, uint8 G, uint8 B) { return FLinearColor(FColor(R, G, B)); }
 	/** A local point on the line from A to B at T. */
 	inline FVector Along(const FVector& A, const FVector& B, float T) { return A + (B - A) * T; }
-	/** The Volcanic's hornito and wagon, shared with the kit. */
+	/** The Volcanic's hornito, shared with the kit. */
 	void VolcanicHornito(FWRIsleSite& S, const FVector& Base, float H, float R);
-	void VolcanicWagon(FWRIsleSite& S, const FVector& At, float Yaw, bool bTipped, int32 Salt);
-	/** The Tundra's sledge, dead pine and tusk, shared with the kit. */
-	void TundraSledge(FWRIsleSite& S, const FVector& At, float Yaw, int32 Salt, bool bLoad);
-	void TundraDeadPine(FWRIsleSite& S, const FVector& G, float H, int32 Salt);
-	void TundraTusk(FWRIsleSite& S, const FVector& Base, const FVector& Ctrl, const FVector& Tip, float Thick);
 	/** World cm of a [x, y] metres array field of the site's row (false if missing). */
 	bool RowPoint(const FWRIsleSite& S, const TCHAR* Obj, const TCHAR* Field, FVector2D& Out);
 }

@@ -946,16 +946,14 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
 - **Shores** (11-22 round 6): wherever ground meets water, give it one continuous profile through the water's level at
   the outline (signed distance); a step between two 4 m samples there makes the waterline follow the grid.
   `round_ground.mjs` SEA_LEVEL (the sea's -0.2 m) and the lake's profile do this.
-- **Cliffs**: `fire_frost_dressing.mjs`'s cliff pass places `basalt_cliff` / `scoria_cliff` / `granite_cliff` /
-  `ice_cliff` by the area of the face (CLIFF_AREA m2 each; spaced over the map, a sheer wall got a row every 40 m up
-  it), the point on the face and the yaw facing down it; `WRWorldDressing`'s FArt `Laid` (> 0) sets the panel there
-  by its middle and leans it back that share of the way to the slope measured on the ground (WRLand::GroundZAt). The
-  cliff pass has its own clearings (16 m from places, 32 m from the Glasswall). Meshes: `make_meshes.py` crag()
-  (SM_Crag_A..D, soft=True SM_CragSoft_A..D). Ice walls (glacier, ice, crevasse, lake ice) get the wall pass instead:
-  followed from foot to top, one `ice_face()` sheet (SM_IceFace_A..D) per stretch, set at 62% of the wall's height and
-  stretched to all of it (FArt `bTall`: width and depth only to 1.6 / 1.3), leaning as the wall's steep middle does
-  (`ice_cliff_pitch`, a per-instance array beside the kind: part 3's cave filter keeps it in step); only real walls
-  (middle over 60 degrees, 6 m+, steep either side along it).
+- **Cliffs**: `fire_frost_dressing.mjs`'s cliff pass places `granite_cliff` panels on the Tundra's steep rock (not
+  its ice) by the area of the face (CLIFF_AREA m2 each; spaced over the map, a sheer wall got a row every 40 m up it),
+  the point on the face and the yaw facing down it; `WRWorldDressing`'s FArt `Laid` (> 0) sets the panel there by its
+  middle and leans it back that share of the way to the slope measured on the ground (WRLand::GroundZAt). The cliff
+  pass has its own clearings (16 m from places, 32 m from the Glasswall). Meshes: `make_meshes.py` crag() (SM_Crag_A..D,
+  soft=True SM_CragSoft_A..D). The steep ice grows its own walls (WRLandCaves, below); the Volcanic's steep ground is
+  carved gullies and layered rock (no panels: laid close up every ridge they read as brick walls). The Old Island
+  still lays `basalt_cliff` and `ice_cliff` (SM_IceFace, FArt `bTall`) from its own dressing file.
 - **The coast** (11-22 round 7): `fire_frost_dressing.mjs`'s coast pass dresses every land's beaches and the meadow lake's
   banks: `beach_pebbles` / `black_pebbles` / `frost_pebbles` (SM_Pebbles, by the land), `wrack` (SM_Wrack, along the
   shore's tangent), `driftwood` (SM_Driftwood, collides), `dune_grass` (the MW pack's grass, pale), `shore_ice` (the
@@ -1038,14 +1036,14 @@ missing cooked platform data". `Tools\check_setup.ps1` FAILs without it.
   landCaves.wallFrom..wallTo, 44-56 degrees, in a Tundra zone) grows out of the land in `WRLandCaves`: the rock's
   field takes the ground pushed out of the face (`LcWallPush`: 0.7-1.9 m, ribs top to bottom, set back in steps),
   so a face stands proud of the land in fluted ice and its top and foot roll into the ground; coloured as weathered
-  ice with the strata faint (`WIce`), snow on its ledges. The SM_IceFace panels are no longer laid
-  (fire_frost_dressing.mjs ICE_FACES). landCaves.walls 0 turns them off (-wrtune=landCaves.walls:0). Cost, measured
-  in the editor's game at 40-54 degrees: ~1,600 more cave meshes, +2.7 GB on a client and +1.9 GB on the server
-  (each procedural mesh ~1.7 MB with its collision); frame times stayed at the 60 fps cap. Cubes that stand in for
-  cut ground (caves, crevasses) are built before any wall. The same code grows the Volcanic's steep ground in rock
-  (landCaves.rockWalls 1, rockFrom/rockTo 44-58): off, it cost +12 GB on a client for little on its dark ridges.
-  The Volcanic's SM_Crag panels are not laid any more (they read as brick walls); its steep ground draws layered
-  rock in M_IslandGround. Growing walls more widely wants baked Nanite meshes, not procedural ones.
+  ice with the strata faint (`WIce`), snow on its ledges. (The SM_IceFace panels they replaced read as rows of striped
+  slabs; that pass is gone from fire_frost_dressing.mjs.) landCaves.walls 0 turns them off
+  (-wrtune=landCaves.walls:0). Cost, measured in the editor's game at 40-54 degrees: ~1,600 more cave meshes, +2.7 GB
+  on a client and +1.9 GB on the server (each procedural mesh ~1.7 MB with its collision); frame times stayed at the
+  60 fps cap. Cubes that stand in for cut ground (caves, crevasses) are built before any wall. Grown the same way, the
+  Volcanic's steep ground in rock cost +12 GB on a client for little on its dark ridges, and was taken out: its steep
+  ground is carved gullies (round_ground.mjs) drawn as layered rock (M_IslandGround). Growing walls more widely wants
+  baked Nanite meshes, not procedural ones.
 - **Cuts in the land** (round 14): a land chunk hangs a 0.9 m skirt round every cut square (a cave's mouth, the
   maze), and the caves' skin is dropped only where the land draws all round it two cells out: either alone left a
   hairline along a cut's edge.

@@ -23,8 +23,6 @@ class WILDREACH_API AWRRoundIsland : public AActor
 public:
 	AWRRoundIsland();
 	virtual void Tick(float DeltaSeconds) override;
-	/** Look checks (wr.Lake): param Name Value | colour Name R G B (sRGB) | material Path (the lake's base material). */
-	void DebugLake(const TArray<FString>& Args);
 
 protected:
 	virtual void BeginPlay() override;

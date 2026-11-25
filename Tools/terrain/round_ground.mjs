@@ -19,7 +19,7 @@ import { CAVE, caveAir } from "./cave_shape.mjs";
 import { layoutCave, coverNeeds, addSkylight, dressCave } from "./cave_layout.mjs";
 import { checkCave, checkMouth } from "./cave_check.mjs";
 
-const { LANDS, lands, coastR, meadowR, warpDeg, fbm, pt, bearingOf, norm, dAng, gauss, RAD, CITY_WALL, LAKE, lakeOutline, stream, trunks, islets, edgeOf, FIRST_DEG, inPoly } = RI;
+const { LANDS, lands, coastR, meadowR, warpDeg, fbm, pt, bearingOf, norm, gauss, RAD, CITY_WALL, lakeOutline, stream, trunks, islets, edgeOf, FIRST_DEG, inPoly } = RI;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const t0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - t0) / 1000).toFixed(1)} s]`, ...a);
@@ -1035,7 +1035,6 @@ for (let k = 0; k < N * N; k++) {
 }
 const packed = zlib.deflateSync(bytes, { level: 9 });
 fs.writeFileSync(path.join(root, "Data/lands/island_ground.bin"), packed);
-const sRGB = (h) => [parseInt(h.slice(1, 3), 16), parseInt(h.slice(3, 5), 16), parseInt(h.slice(5, 7), 16)];
 const ZONES = [
 	{ id: "storm_peaks", letter: "1", name: "Storm peaks", ground: [104, 110, 106], groundAlt: [122, 130, 112], layers: { stones: 0.55, grass: 0.25, soil: 0.2 } },
 	{ id: "desert", letter: "2", name: "the Desert", ground: [214, 186, 132], groundAlt: [200, 166, 110], layers: { sand: 0.95, stones: 0.05 } },

@@ -130,13 +130,14 @@ for (let gx = -6600; gx < 6600; gx += C) {
 		}
 	}
 }
-// ---- cliffs: every steep face in the two lands covered in panels of jointed rock (11-22 round 6) ----------------------
-// The 4 m ground drew a cliff as its texture stretched down a smooth wall. Ground steeper than CLIFF_DEG gets panels
-// (SM_Crag, 10 m across) by the area of its face, one to every CLIFF_AREA m2 of it (a near-vertical face has many times
-// the face of its footprint: spaced over the map, a 55 m wall got a row every 40 m up it), each facing straight down the
-// slope, its point on the face (the game sets it there by its middle and leans it back toward the slope: WRWorldDressing's Laid),
-// in its land's rock: frosted rock on the Tundra's ice and snow, granite on its rock, scoria on the Volcanic's cones and
-// cinder, basalt elsewhere.
+// ---- cliffs: the Tundra's steep rock faces covered in panels of jointed granite (11-22 round 6) ------------------------
+// The 4 m ground drew a cliff as its texture stretched down a smooth wall. The Tundra's ground steeper than CLIFF_DEG,
+// where it isn't ice, gets panels (SM_Crag, 10 m across) by the area of its face, one to every CLIFF_AREA m2 of it (a
+// near-vertical face has many times the face of its footprint: spaced over the map, a 55 m wall got a row every 40 m up
+// it), each facing straight down the slope, its point on the face (the game sets it there by its middle and leans it back
+// toward the slope: WRWorldDressing's Laid). (Round 14: the steep ice grows out of the land as fluted ice walls instead,
+// WRLandCaves LcWallPush; the Volcanic's panels, laid close up every ridge, read as brick walls: its steep ground is
+// carved into gullies by round_ground.mjs and drawn as layered rock by M_IslandGround.)
 const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 {
 	// Their own clearings: a place stands on level ground, so a cliff panel need only keep 16 m from it (the dressing's
@@ -159,10 +160,8 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 	const cb = new Map();
 	for (const [cx, cy, r] of cliffClear) for (let i = Math.floor((cx - r) / CELL); i <= Math.floor((cx + r) / CELL); i++) for (let j = Math.floor((cy - r) / CELL); j <= Math.floor((cy + r) / CELL); j++) { const k = i + "," + j; if (!cb.has(k)) cb.set(k, []); cb.get(k).push([cx, cy, r]); }
 	const cliffOk = (x, y) => !(cb.get(Math.floor(x / CELL) + "," + Math.floor(y / CELL)) || []).some(([cx, cy, r]) => Math.hypot(x - cx, y - cy) < r + 4);
-	const ICY = new Set(["glacier", "ice", "snow", "snow_forest", "crevasse", "lake_ice", "snow_crack"].map((k) => SURF[k]));
 	// (round 7: ice faces on the ice itself; a steep face in the snow is rock showing through it: granite panels)
 	const ICE = new Set(["glacier", "ice", "crevasse", "lake_ice"].map((k) => SURF[k]));
-	const RED = new Set(["scoria", "cinder", "cinder_grass", "oxide"].map((k) => SURF[k]));
 	let cliffs = 0;
 	for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
 		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
@@ -176,79 +175,21 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 		for (let t = 0; t < tries; t++) {
 		const x = gx + rand(ci, cj, 901 + t * 11) * CLIFF_STEP, y = gy + rand(ci, cj, 902 + t * 11) * CLIFF_STEP;
 		const zc = zoneAt(x, y);
-		if (!zc || !PLAN[zc]) continue;
+		if (!zc || !PLAN[zc] || !/^T/.test(zc)) continue;
 		const h = hAt(x, y);
 		if (h < 2 || slopeAt(x, y) < CLIFF_DEG) continue;
 		if (!cliffOk(x, y) || lavaDist(x, y) < LAND.lava.width / 2 + 6) continue;
 		const sf = surfAt(x, y);
-		if (sf === SURF.road || sf === SURF.main_road || sf === SURF.lava || sf === SURF.lava_crust) continue;
+		// (the ice grows its own walls out of the land: WRLandCaves)
+		if (sf === SURF.road || sf === SURF.main_road || ICE.has(sf)) continue;
 		// downhill: against the ground's gradient
 		const gxh = hAt(x + 3, y) - hAt(x - 3, y), gyh = hAt(x, y + 3) - hAt(x, y - 3), gl = Math.hypot(gxh, gyh) || 1;
 		const dx = -gxh / gl, dy = -gyh / gl;
-		const z = h;
-		if (/^T/.test(zc) && ICE.has(sf)) continue;   // the ice walls are laid along their foot (below)
-		// (round 14: none in the Volcanic: laid close up every ridge, terrace and bank they read as brick walls; its steep
-		// ground grows out of the land as rock instead, WRLandCaves LcWallPush)
-		if (!/^T/.test(zc)) continue;
-		const kind = /^T/.test(zc) ? "granite_cliff" : RED.has(sf) ? "scoria_cliff" : "basalt_cliff";
-		add(kind, x, y, z, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 903 + t * 11) - 0.5) * 16, 0.85 + 0.45 * rand(ci, cj, 904 + t * 11));
+		add("granite_cliff", x, y, h, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 903 + t * 11) - 0.5) * 16, 0.85 + 0.45 * rand(ci, cj, 904 + t * 11));
 		cliffs++;
 		}
 	}
 	console.log("cliffs:", cliffs, "panels on ground over", CLIFF_DEG, "degrees");
-	// The Tundra's ice walls (round 7): laid by the area of the face, the panels stood in rows up a tall wall, each row's
-	// top a ledge, so a wall read as a stack of slabs. Here each wall gets one row: from each steep icy point the wall is
-	// followed down to its foot and up to its top (where the ground eases under 26 degrees), and one face (SM_IceFace) is
-	// set at 62% of its height, stretched to the wall's whole height (a face is ~9.5 m tall at scale 1; its width and depth
-	// grow only to 1.6 and 1.3: WRWorldDressing bTall), facing down it and leaning back as the wall's steep middle does
-	// ("ice_cliff_pitch": from where the wall is 15% up to 85%; measured round the face's middle on a 60 m wall it lay
-	// back like an awning); along the wall the next one stands about two-thirds of a face's width on.
-	// (round 14: none laid. From the air the faces still read as rows of striped slabs, on the cirque's terraces like
-	// radiators, a lone one on a big wall like a door; the steep ice itself now grows out of the land as fluted ice walls,
-	// WRLandCaves LcWallPush, as the caves' mouths do. Kept here, off, should panels be wanted somewhere again.)
-	const ICE_FACES = false;
-	const anchors = new Map(), AC = 12;
-	const near = (x, y, r) => { for (let i = Math.floor((x - r) / AC); i <= Math.floor((x + r) / AC); i++) for (let j = Math.floor((y - r) / AC); j <= Math.floor((y + r) / AC); j++) for (const [ax, ay] of anchors.get(i + "," + j) || []) if (Math.hypot(x - ax, y - ay) < r) return true; return false; };
-	let walls = 0;
-	if (ICE_FACES) for (let gx = -6600; gx < 6600; gx += CLIFF_STEP) for (let gy = -6600; gy < 6600; gy += CLIFF_STEP) {
-		const ci = Math.round(gx / CLIFF_STEP), cj = Math.round(gy / CLIFF_STEP);
-		const x = gx + rand(ci, cj, 931) * CLIFF_STEP, y = gy + rand(ci, cj, 932) * CLIFF_STEP;
-		const zc = zoneAt(x, y);
-		if (!zc || !/^T/.test(zc) || !PLAN[zc] || !ICE.has(surfAt(x, y)) || slopeAt(x, y) < CLIFF_DEG) continue;
-		const gxh = hAt(x + 3, y) - hAt(x - 3, y), gyh = hAt(x, y + 3) - hAt(x, y - 3), gl = Math.hypot(gxh, gyh) || 1;
-		const dx = -gxh / gl, dy = -gyh / gl;
-		let up = 0, dn = 0;
-		while (up < 70 && slopeAt(x - dx * (up + 1), y - dy * (up + 1)) >= 26) up++;
-		while (dn < 70 && slopeAt(x + dx * (dn + 1), y + dy * (dn + 1)) >= 26) dn++;
-		const bx = x + dx * (dn + 1), by = y + dy * (dn + 1), hB = hAt(bx, by), hT = hAt(x - dx * (up + 1), y - dy * (up + 1)), H = hT - hB;
-		if (H < 3 || hB < 1) continue;
-		const want = hB + 0.62 * H;
-		let ax = x, ay = y;
-		for (let s = 0; s <= up + dn + 2; s += 0.5) { const qx = bx - dx * s, qy = by - dy * s; if (hAt(qx, qy) >= want) { ax = qx; ay = qy; break; } }
-		const S = Math.min(8, Math.max(0.5, H / 9.5));
-		if (near(ax, ay, 8.2 * Math.min(S, 1.6)) || !cliffOk(ax, ay)) continue;
-		// the steep middle's run: where the wall is 15% and 85% of the way up
-		let s15 = 0, s85 = 0;
-		for (let s = 0; s <= up + dn + 2; s += 0.5) { const hh = hAt(bx - dx * s, by - dy * s); if (!s15 && hh >= hB + 0.15 * H) s15 = s; if (hh >= hB + 0.85 * H) { s85 = s; break; } }
-		const lean = Math.max(0, Math.atan2(Math.max(0.5, s85 - s15), 0.7 * H) * 180 / Math.PI);
-		// only a wall (its middle steeper than 60 degrees, 6 m or more): on a steep slope or a dome a flat face lies on
-		// it like a slab; the ground's own ice colour is better there
-		if (lean > 30 || H < 6) continue;
-		// (ice on top too: a glacier front or a shelf; a knob of rock with ice on its flank isn't an ice wall)
-		if (!ICE.has(surfAt(x - dx * (up + 3), y - dy * (up + 3))) || !ICE.has(surfAt(ax, ay))) continue;
-		// and a wall runs on: steep either side along it (a lone face on a knob of ice stood out like a door on a dome)
-		{
-			const w = 8 * Math.min(S, 1.6), tx = -dy, ty = dx;
-			if (slopeAt(ax + tx * w, ay + ty * w) < 45 || slopeAt(ax - tx * w, ay - ty * w) < 45) continue;
-		}
-		const k = Math.floor(ax / AC) + "," + Math.floor(ay / AC);
-		if (!anchors.has(k)) anchors.set(k, []);
-		anchors.get(k).push([ax, ay]);
-		add("ice_cliff", ax, ay, want, Math.atan2(dy, dx) * 180 / Math.PI + (rand(ci, cj, 933) - 0.5) * 8, +S.toFixed(2));
-		(out.ice_cliff_pitch ||= []).push(+lean.toFixed(1));
-		walls++;
-	}
-	console.log("ice walls:", walls, "faces");
 }
 // ---- the coast: what the sea leaves on its beaches (11-22 round 7) ---------------------------------------------------
 // The beaches ran bare sand to the water's edge. Along the whole island's coast (every land; the cliffs' and the islets'
@@ -259,7 +200,7 @@ const CLIFF_DEG = 40, CLIFF_STEP = 3, CLIFF_AREA = 55, CLIFF_AREA_ICE = 38;
 {
 	// (the sea's material lifts and waves its surface over its level: the water's edge you see lies near +0.75 m (the
 	// pebbles laid to +0.75 stood in the water's edge), so the strand line, the swash and the logs are measured from there)
-	const SEA = -0.2, SHOWN = 0.75, LAKE = LAND.lake.level;
+	const SHOWN = 0.75, LAKE = LAND.lake.level;
 	const sm = (a, b, x) => { const t = Math.min(1, Math.max(0, (x - a) / (b - a))); return t * t * (3 - 2 * t); };
 	const RL = read("Tools/terrain/round_island_layout.json");
 	const away = [];
@@ -620,15 +561,12 @@ console.log("dressing:", Object.entries(counts).map(([k, n]) => k + " " + n).joi
 	let cut = 0;
 	const inMouth = (x, y) => (LAND.caves || []).some((c) => { const [mx, my] = c.mouth, [dx, dy] = c.dir, s = (x - mx) * dx + (y - my) * dy, lat = -(x - mx) * dy + (y - my) * dx; return Math.hypot(x - mx, y - my) < 16 || (s > -14 && s < 14 && Math.abs(lat) < 9) || (c.shapes || []).some((q) => q.k === "shaft" && Math.hypot(x - q.c[0], y - q.c[1]) < q.r + 5); });
 	for (const [kind, arr] of Object.entries(file.instances)) {
-		if (kind.endsWith("_pitch")) continue;   // (a kind's per-instance leans: kept in step with it below)
-		const pitch = file.instances[kind + "_pitch"], keepI = [], keepP = [];
+		const keepI = [];
 		for (let i = 0; i + 4 < arr.length; i += 5) {
 			if (inMouth(arr[i] / 100, arr[i + 1] / 100)) { cut++; continue; }
 			keepI.push(arr[i], arr[i + 1], arr[i + 2], arr[i + 3], arr[i + 4]);
-			if (pitch) keepP.push(pitch[i / 5]);
 		}
 		file.instances[kind] = keepI;
-		if (pitch) file.instances[kind + "_pitch"] = keepP;
 		file.counts[kind] = keepI.length / 5;
 	}
 	console.log("caves cleared of", cut, "dressing pieces");

@@ -529,7 +529,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 	              bool bOrigin = false;           // its origin on the ground (pebbles half sunk), not its lowest point; Size zero = the mesh's own size
 	              bool bFollow = false;           // tipped to the ground's slope under it (a patch of pebbles 3.4 m across)
 	              bool bShadow = false;           // casts shadows though small and walked through
-	              bool bTall = false;             // its scale stretches it up (a wall's height), its width and depth only so far; its lean from "<kind>_pitch"
+	              bool bTall = false;             // its scale stretches it up (a wall's height), its width and depth only so far
 	              TArray<float> Tinted; };        // M_BuildTinted's per-instance data (shade, axis, brightness, colour, metal, rough, glow, pattern): shade and grain axis set per instance
 	static const TCHAR* RockMat = TEXT("/Game/Terrain/M_Rock.M_Rock");
 	static const TCHAR* IceMat = TEXT("/Game/Terrain/M_IceBlock.M_IceBlock");
@@ -593,9 +593,8 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 		// top to bottom; bTall) and leaning as the wall's steep middle does (the dressing's wall pass), their sides and tops
 		// thinning into the slope so they join; the strata show faintly through a crust.)
 		{ TEXT("ice_cliff"), { Gen(TEXT("SM_IceFace"), TEXT("ABCD")), FVector::ZeroVector, 40, true, 45000, FVector(0, 0, 2), false, IceMat, { { TEXT("Tint"), FLinearColor(1.f, 1.f, 1.f) } }, { { TEXT("Snow"), 0.6f } }, false, 0.9f, false, false, false, true } },
-		// The Tundra's rock faces (granite) and the Volcanic's cones and crater (scoria): the same panels in their rock.
+		// The Tundra's rock faces (granite): the same panels in their rock.
 		{ TEXT("granite_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.5f, 0.5f, 0.53f) } }, { { TEXT("Snow"), 0.45f } }, false, 0.75f } },
-		{ TEXT("scoria_cliff"), { Gen(TEXT("SM_Crag"), TEXT("ABCD")), FVector(500, 1000, 820), 90, true, 45000, FVector(0, 0, 4), false, RockMat, { { TEXT("Tint"), FLinearColor(0.3f, 0.17f, 0.13f) } }, { { TEXT("Dust"), 0.3f } }, false, 0.75f } },
 		// Fitted heights are the meshes' bounds, about twice their leafy part: 260 cm makes a bush of a metre or so.
 		// The volcanic west's scrub is dead (cooks/cookpass-world.md 3.7, G22): the GV leaves stayed green whatever their
 		// tint, and greying them with their "snow" coat (world.ashCoatMin) hung the GPU in the virtual shadow maps' Nanite
@@ -695,10 +694,6 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 			return true;
 		}
 		const int32 Count = Arr.Num() / 5;
-		// Per-instance lean (degrees back from upright) where the writer measured it ("<kind>_pitch": an ice wall's own steep
-		// middle, which a slope measured on the ground round the face's middle misjudged on a 60 m wall).
-		const TArray<TSharedPtr<FJsonValue>>* PitchArr = nullptr;
-		if (!Instances->TryGetArrayField(KindName + TEXT("_pitch"), PitchArr) || PitchArr->Num() != Count) PitchArr = nullptr;
 		for (int32 m = 0; m < Meshes.Num(); ++m)
 		{
 			const FBox Box = Meshes[m]->GetBoundingBox();
@@ -725,7 +720,7 @@ void AWRDressing::Build(const TSharedPtr<FJsonObject>& Instances)
 					const float Reach = FMath::Max(400.f, 0.5f * float(Box.GetSize().Z * Scale.Z));
 					const float Behind = WRLand::GroundZAt(Ground - Dir * Reach, Ground.Z), Ahead = WRLand::GroundZAt(Ground + Dir * Reach, Ground.Z);
 					const float Slope = FMath::RadiansToDegrees(FMath::Atan2(FMath::Max(0.f, Behind - Ahead), 2.f * Reach));
-					Rot.Pitch += PitchArr ? float((*PitchArr)[i]->AsNumber()) : FMath::Clamp((90.f - Slope) * A.Laid, 0.f, 55.f);
+					Rot.Pitch += FMath::Clamp((90.f - Slope) * A.Laid, 0.f, 55.f);
 					const FQuat Q = Rot.Quaternion();
 					const float Mid = FMath::Lerp(Box.Min.Z, Box.Max.Z, 0.62f) * Scale.Z;
 					Transforms.Emplace(Rot, Ground - Q.GetUpVector() * Mid - Q.GetForwardVector() * (A.Sink * float(Scale.X / Fit.X)), Scale);

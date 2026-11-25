@@ -18,7 +18,7 @@ import { fileURLToPath } from "url";
 import * as RI from "./round_island.mjs";
 import * as PLAN from "./hearthmoot_plan.mjs";
 
-const { quarters, trunks, CITY_WALL, RAD, norm, dAng, pt, bearingOf, lakeOutline, inPoly } = RI;
+const { quarters, trunks, CITY_WALL, RAD, norm, dAng, pt, bearingOf } = RI;
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 
 // ---- the ground's heights ---------------------------------------------------------------------------------------------
@@ -157,7 +157,7 @@ function openRoof(F, x0, x1, cy, halfD, z, roof, endThick) {
 	for (const sd of [-1, 1]) block(F, CUBE, TINT, [cx, cy + sd * (halfD * 0.5 + 0.12), z + halfD * 0.5 - 0.42], [x1 - x0 - 0.2, 0.22, 0.24], { roll: sd * 45, colour: wood, nosink: true });
 	block(F, CUBE, TINT, [cx, cy, z + halfD - 0.45], [x1 - x0 - 0.2, 0.24, 0.26], { colour: wood, nosink: true });
 }
-const floorWood = pal([90, 74, 58], 0, 0.9, 0, 1), cloth2 = pal([120, 36, 34], 0, 0.95, 0, 9);
+const floorWood = pal([90, 74, 58], 0, 0.9, 0, 1);
 function table(F, x, y, len, wid, along = 0) {
 	const G = frame(...F.at(x, y, 0).slice(0, 2), F.z, F.yaw + along);
 	block(G, CUBE, TINT, [0, 0, 0.92], [len, wid, 0.1], { colour: darkWood, nosink: true, solid: true });
