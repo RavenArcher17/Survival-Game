@@ -71,6 +71,9 @@ spots) and the Volcanic (34), and everything they turned up.
   a hard line across the land; a ragged band 15-55 m wide of each zone's own ground now blends them, with its grass.
 - **The lake's bank** grows a few tufts instead of the meadow's grass to the water.
 - **Emberwick's paths** are packed grey ash (brown, they still drew lines on the greyed ash).
+- **Checked again:** the coast surveyed (36 spots; the unbuilt lands seen from it are left for their slices), a night
+  pass over all three lands (fires, lamps, the lava's glow, the black-ice lakes and the maze all read in the dark),
+  the round-island tests (0 failed; the city 18.1 ms, the meadow 11.1 ms), the Tundra cave walks (131 of 132).
 - **Memory:** the ice walls cost about 2.3 GB on a client and 1.6 GB on the server (measured in the editor's game);
   each cube of cave or wall now keeps only the vertices it draws.
 - **Checked:** the round-island tests pass (0 failed; the city 17.3 ms a frame, the meadow 9.8 ms). The Tundra's
