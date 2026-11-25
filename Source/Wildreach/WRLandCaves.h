@@ -71,6 +71,8 @@ private:
 	float Cell = 100.f;
 	int32 Cells = 20;
 	int32 Meshes = 0;
+	/** Vertices no longer held twice by a mesh with both a rock and a lip section (FinishCube), for the build log. */
+	int64 SplitSaved = 0;
 	UPROPERTY() TArray<TObjectPtr<UProceduralMeshComponent>> Rock;
 	UPROPERTY() TMap<FName, TObjectPtr<UMaterialInterface>> Walls;
 	UPROPERTY() TMap<FName, TObjectPtr<UMaterialInterface>> FormationMats;

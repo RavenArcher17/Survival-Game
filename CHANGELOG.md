@@ -2,6 +2,39 @@
 
 ## Unreleased
 
+### Round island: the first two slices cleaned up and made faster (11-24)
+
+Raven: "If you think these 2 slices are perfect then clean up any dead code and optimize what's there and once
+that's good we'll move on". Measured in the editor's game at 1600x900, Epic, frame rate uncapped.
+- **Faster everywhere on the island, most in the city:** Lumen re-captured an eighth of its lighting cache's cards
+  every frame in case their materials changed, and with the island's hundred thousand instanced pieces (the city's
+  blocks, the dressing) that took 5-7 ms of the graphics card's time a frame. It now captures each card when it
+  comes into view and keeps it (lighting is still worked out every frame; only a material changing, wet ground in
+  rain, isn't caught up). A joined player in the city: 16.4 -> 10.0 ms a frame (61 -> 100 fps); on the meadow 12.3 ->
+  9.7 ms. Pictures before and after are the same (under 1.4 / 255 apart).
+- **The city's people cost a third of what they did on the host:** each of the hundred people was a whole survivor:
+  two cameras, a camera boom testing for walls every frame, the breath-under-water check, and every piece of the body
+  (head, clothes, hair, brows, lashes, empty outfit slots) updating every frame even far off, where the body itself
+  only moves a few times a second. People now drop the cameras, the boom and the breath check, their pieces keep the
+  body's own pace and the empty ones don't update at all, and someone standing still moves four times a second.
+  Playing alone (the host runs the people too): 17.7 -> 10.1 ms a frame in the city (2,219 -> 460 things updating each
+  frame), 15.3 -> 9.9 ms on the meadow.
+- **Walkers far off walk at their pace on the host:** away from you a walker took its step toward the next point a
+  few times a second but moved every frame, so it had the step one frame in several and crept. Now its movement keeps
+  the same pace as its steps: all 32 walkers covered 11-15 m in 10 s, near or 260 m off.
+- **0.8 GB less memory:** a cave or ice wall mesh with both its rock and the ground's skin handed each part every
+  vertex of the other as well, held twice over and twice in its collision; each part now has only its own (3.6
+  million vertices: 12.7 -> 11.9 GB on a client, 13.4 -> 12.6 GB on the host).
+- **Dead code out:** the Volcanic's rock walls (off since they cost 12 GB), the old ice-face panel pass, the lake's
+  look-tuning command, functions and fields nothing called, a deprecated engine call (the build's one warning), unused
+  helpers in the ground, dressing and city scripts. The data the scripts write came out the same, byte for byte (the
+  city's file one unused colour shorter). `wr.FarActors` takes a class filter.
+- Tried and left out: drawing the ground's and the caves' meshes on the renderer's static path (no difference: the
+  graphics card, not the render thread, sets the pace), switching off the people's hair simulation (no difference).
+- Checked: round-island tests 0 failed (the test's city 17.0 -> 11.4 ms, meadow 10.7 -> 8.5 ms at its 120 fps cap);
+  Tundra cave walks 131 of 132 (as before), the maze's walks all arrive; people close up with their faces, hair and
+  clothes.
+
 ### Round island: the look pass, thirteenth round: the Tundra finished, the Volcanic's cliffs and ground (11-24)
 
 Raven: "Keep fixing everything you find until we can move onto the next biome". A fresh survey of the Tundra (35

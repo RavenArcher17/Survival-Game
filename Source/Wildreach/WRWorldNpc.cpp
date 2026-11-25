@@ -35,6 +35,10 @@
 #include "Camera/PlayerCameraManager.h"
 #include "GameFramework/PlayerController.h"
 #include "HAL/IConsoleManager.h"
+#include "Camera/CameraComponent.h"
+#include "GameFramework/SpringArmComponent.h"
+#include "GroomComponent.h"
+#include "WRUnderwater.h"
 
 namespace WRNpcDetail
 {
@@ -155,6 +159,16 @@ void AWRWorldNpc::BeginPlay()
 			Body->bEnableUpdateRateOptimizations = true;
 		}
 	}
+	// Nobody looks through an NPC and none of them dives: its two cameras, its camera boom (a collision sweep every frame)
+	// and its breath (a water check) were a survivor's, ticking for each of a city's hundred people (round 15).
+	if (ThirdPersonBoom)
+	{
+		ThirdPersonBoom->bDoCollisionTest = false;
+		ThirdPersonBoom->SetComponentTickEnabled(false);
+	}
+	if (ThirdPersonCamera) ThirdPersonCamera->SetComponentTickEnabled(false);
+	if (FirstPersonCamera) FirstPersonCamera->SetComponentTickEnabled(false);
+	if (Dive) Dive->SetComponentTickEnabled(false);
 	LastPos = GetActorLocation();
 	WorkClock = FMath::FRandRange(0.f, WorkEvery);
 }
@@ -276,14 +290,43 @@ void AWRWorldNpc::StepCrowdCost()
 	const FWRTuning& T = FWRTuning::Get();
 	const float D = FVector::Dist(View, GetActorLocation());
 	const float Every = D < T.Num(TEXT("roundIsland.peopleNear"), 1500.f) ? 0.f : D < T.Num(TEXT("roundIsland.peopleMid"), 4000.f) ? T.Num(TEXT("roundIsland.peopleMidEvery"), 0.05f) : T.Num(TEXT("roundIsland.peopleFarEvery"), 0.12f);
-	if (Body && !FMath::IsNearlyEqual(Body->PrimaryComponentTick.TickInterval, Every)) Body->SetComponentTickInterval(Every);
-	if (!FMath::IsNearlyEqual(PrimaryActorTick.TickInterval, Every)) SetActorTickInterval(Every);
 	const bool bHide = WRNpcDetail::HidePeople != 0;
 	if (bHide != IsHidden())
 	{
 		SetActorHiddenInGame(bHide);
 		if (Body) Body->SetComponentTickEnabled(!bHide);
 	}
+	// The body's other pieces (the head, the clothes, the hair cards) keep the body's own rate (round 15): each ticked
+	// every frame, sending the body's unchanged pose again between its updates and moving the hair's bounds. Pieces with
+	// nothing on them (an empty outfit slot, no beard) or hidden (hair under a helm) don't tick at all. Their rates are
+	// set together, so they tick in the frames the body does.
+	bool bRate = Body && !FMath::IsNearlyEqual(Body->PrimaryComponentTick.TickInterval, Every);
+	TInlineComponentArray<USkeletalMeshComponent*> Skins(this);
+	for (USkeletalMeshComponent* Sk : Skins)
+	{
+		if (!Sk || Sk == Body) continue;
+		const bool bOn = !bHide && Sk->GetSkinnedAsset() != nullptr && Sk->IsVisible();
+		if (Sk->IsComponentTickEnabled() != bOn) { Sk->SetComponentTickEnabled(bOn); bRate = true; }
+	}
+	for (UGroomComponent* G : Grooms)
+	{
+		if (!G) continue;
+		const bool bOn = !bHide && G->GroomAsset != nullptr && G->IsVisible();
+		if (G->IsComponentTickEnabled() != bOn) { G->SetComponentTickEnabled(bOn); bRate = true; }
+	}
+	// On the host its movement too: a walker's at its own tick's rate (its steps toward the next point come from that
+	// tick: moving every frame, it had the step only one frame in several far off), someone standing four times a second.
+	UCharacterMovementComponent* Move = GetCharacterMovement();
+	const float MoveEvery = !HasAuthority() || !Move ? 0.f : bWalking ? Every : FMath::Max(Every, 0.25f);
+	if (Move && HasAuthority() && !FMath::IsNearlyEqual(Move->PrimaryComponentTick.TickInterval, MoveEvery)) Move->SetComponentTickInterval(MoveEvery);
+	if (bRate)
+	{
+		if (Body) Body->SetComponentTickInterval(Every);
+		for (USkeletalMeshComponent* Sk : Skins) if (Sk && Sk != Body && Sk->IsComponentTickEnabled()) Sk->SetComponentTickInterval(Every);
+		for (UGroomComponent* G : Grooms) if (G && G->IsComponentTickEnabled()) G->SetComponentTickInterval(Every);
+		SetActorTickInterval(Every);
+	}
+	else if (!FMath::IsNearlyEqual(PrimaryActorTick.TickInterval, Every)) SetActorTickInterval(Every);
 }
 
 void AWRWorldNpc::OnDeath(AActor* Killer)

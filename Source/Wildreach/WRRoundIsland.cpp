@@ -1494,15 +1494,17 @@ namespace WRRoundIslandImpl
 		}
 		UE_LOG(LogWildreach, Log, TEXT("TALL %d found"), N);
 	}
-	/** Look checks: every actor whose root stands farther than Km from the island's middle (wr.FarActors [km]). */
+	/** Look checks: every actor whose root stands farther than Km from the island's middle, of a class whose name holds
+	 *  the filter if one's given (wr.FarActors [km] [class]). */
 	void FarActors(const TArray<FString>& Args, UWorld* World)
 	{
 		const double Far = (Args.Num() ? FCString::Atod(*Args[0]) : 6.0) * 100000.0;
+		const FString Only = Args.Num() > 1 ? Args[1] : FString();
 		int32 N = 0;
 		for (TActorIterator<AActor> It(World); It; ++It)
 		{
 			const FVector L = It->GetActorLocation();
-			if (FVector2D(L.X, L.Y).Size() < Far) continue;
+			if (FVector2D(L.X, L.Y).Size() < Far || (!Only.IsEmpty() && !It->GetClass()->GetName().Contains(Only))) continue;
 			if (++N <= 80) UE_LOG(LogWildreach, Log, TEXT("FAR %s (%s) at %s"), *It->GetName(), *It->GetClass()->GetName(), *L.ToCompactString());
 		}
 		UE_LOG(LogWildreach, Log, TEXT("FAR %d actors"), N);
@@ -1544,7 +1546,7 @@ namespace WRRoundIslandImpl
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&Ahead));
 	static FAutoConsoleCommandWithWorldAndArgs CensusCmd(TEXT("wr.ActorCensus"), TEXT("Logs how many actors of each class are in the world."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&ActorCensus));
-	static FAutoConsoleCommandWithWorldAndArgs FarCmd(TEXT("wr.FarActors"), TEXT("Logs every actor farther than Km from the middle (wr.FarActors [km])."),
+	static FAutoConsoleCommandWithWorldAndArgs FarCmd(TEXT("wr.FarActors"), TEXT("Logs every actor farther than Km from the middle, of a class holding the filter (wr.FarActors [km] [class])."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FarActors));
 	static FAutoConsoleCommandWithWorldAndArgs FindTallCmd(TEXT("wr.FindTall"), TEXT("Logs every thin, tall visible thing (wr.FindTall [min metres])."),
 		FConsoleCommandWithWorldAndArgsDelegate::CreateStatic(&FindTall));

@@ -467,7 +467,7 @@ void AWRLandCaves::Tick(float DeltaSeconds)
 	{
 		bBuiltLogged = true;
 		SetActorTickInterval(1.f);
-		UE_LOG(LogWildreach, Log, TEXT("LAND CAVES built: %d rock meshes"), Meshes);
+		UE_LOG(LogWildreach, Log, TEXT("LAND CAVES built: %d rock meshes (%lld vertices not doubled across their two sections)"), Meshes, SplitSaved);
 	}
 }
 
@@ -1288,11 +1288,27 @@ void AWRLandCaves::FinishCube(const FCube& C)
 	Mesh->SetCollisionProfileName(TEXT("BlockAll"));
 	Mesh->SetCollisionObjectType(ECC_WorldStatic);
 	Mesh->SetCanEverAffectNavigation(false);
+	// Each section gets only its own vertices. The rock's come first, the lip's after them (ComputeCube copies every lip
+	// vertex and numbers the rock's first): handed every vertex, each section kept the other's too, twice over in memory
+	// and in the collision.
+	int32 RockN = 0;
+	for (const int32 I : C.Mesh.Tris) RockN = FMath::Max(RockN, I + 1);
+	bool bSplit = true;
+	for (const int32 I : C.Lip) if (I < RockN) { bSplit = false; break; }
+	const int32 N = C.Mesh.Verts.Num();
+	const int32 RockEnd = bSplit ? RockN : N, LipFrom = bSplit ? RockN : 0;
+	const auto Part = [](const auto& Arr, int32 From, int32 To)
+	{
+		using FElem = typename std::remove_reference_t<decltype(Arr)>::ElementType;
+		To = FMath::Min(To, Arr.Num());
+		return From == 0 && To == Arr.Num() ? Arr : TArray<FElem>(Arr.GetData() + From, FMath::Max(0, To - From));
+	};
 	int32 Section = 0;
 	if (C.Mesh.Tris.Num() > 0)
 	{
 		// The cave's own rock: the Volcanic's basalt, the Tundra's ice (their surface in the vertex colour and UV1-2).
-		Mesh->CreateMeshSection(Section, C.Mesh.Verts, C.Mesh.Tris, C.Mesh.Normals, C.Mesh.UVs, C.RockUV1, C.RockUV2, C.Mesh.UVs, C.RockColours, TArray<FProcMeshTangent>(), true);
+		const TArray<FVector2D> UV0 = Part(C.Mesh.UVs, 0, RockEnd);
+		Mesh->CreateMeshSection(Section, Part(C.Mesh.Verts, 0, RockEnd), C.Mesh.Tris, Part(C.Mesh.Normals, 0, RockEnd), UV0, Part(C.RockUV1, 0, RockEnd), Part(C.RockUV2, 0, RockEnd), UV0, Part(C.RockColours, 0, RockEnd), TArray<FProcMeshTangent>(), true);
 		Mesh->SetMaterial(Section++, WallMaterial(C.Biome));
 	}
 	if (C.Lip.Num() > 0)
@@ -1302,13 +1318,19 @@ void AWRLandCaves::FinishCube(const FCube& C)
 		{
 			for (TActorIterator<AWRLand> It(GetWorld()); It; ++It) if (It->LandId == Land->Id) { GroundLook = It->GroundLook(); break; }
 		}
+		TArray<int32> Lip = C.Lip;
+		if (LipFrom > 0) for (int32& I : Lip) I -= LipFrom;
 		TArray<FProcMeshTangent> Tangents;
-		Tangents.Reserve(C.LipTangentX.Num());
-		for (const FVector& T : C.LipTangentX) Tangents.Add(FProcMeshTangent(T, false));
-		if (Land->bLayered) Mesh->CreateMeshSection_LinearColor(Section, C.Mesh.Verts, C.Lip, C.Mesh.Normals, C.Mesh.UVs, C.UV1, C.UV2, C.UV3, C.Colours, Tangents, true);
-		else Mesh->CreateMeshSection_LinearColor(Section, C.Mesh.Verts, C.Lip, C.Mesh.Normals, C.Mesh.UVs, C.Colours, Tangents, true);
+		Tangents.Reserve(N - LipFrom);
+		for (int32 i = LipFrom; i < C.LipTangentX.Num(); ++i) Tangents.Add(FProcMeshTangent(C.LipTangentX[i], false));
+		const TArray<FVector> V = Part(C.Mesh.Verts, LipFrom, N), Nm = Part(C.Mesh.Normals, LipFrom, N);
+		const TArray<FVector2D> UV0 = Part(C.Mesh.UVs, LipFrom, N);
+		const TArray<FLinearColor> Col = Part(C.Colours, LipFrom, N);
+		if (Land->bLayered) Mesh->CreateMeshSection_LinearColor(Section, V, Lip, Nm, UV0, Part(C.UV1, LipFrom, N), Part(C.UV2, LipFrom, N), Part(C.UV3, LipFrom, N), Col, Tangents, true);
+		else Mesh->CreateMeshSection_LinearColor(Section, V, Lip, Nm, UV0, Col, Tangents, true);
 		Mesh->SetMaterial(Section, GroundLook ? GroundLook.Get() : FWRToolMesh::Material());
 	}
+	SplitSaved += bSplit && C.Mesh.Tris.Num() > 0 && C.Lip.Num() > 0 ? N : 0;
 	Mesh->SetCullDistance(WRTune(TEXT("landCaves.cullDistance"), 60000.f));
 	Mesh->RegisterComponent();
 	Rock.Add(Mesh);

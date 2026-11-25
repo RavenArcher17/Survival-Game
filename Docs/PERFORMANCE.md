@@ -210,6 +210,40 @@ this pass is for.
   `Build/Windows/PipelineCaches/Wildreach_PCD3D_SM6.spc` / `_SM5.spc`, which `.gitignore` lets through), commit them and
   package again: the cook bundles them. A stale cache only misses states; it never breaks anything.
 
+## Round island pass 2026-11-24 (L_Wildreach, the first two slices)
+
+Measured in the editor's game, 1600x900, Epic, `t.MaxFPS 0`, at Hearthmoot's plaza looking west and on the meadow
+(the scratch scripts behind it: a dedicated server and one bot, `csvprofile` 12 s per spot, `memreport`; a listen-host
+variant for playing alone; Unreal Insights traces exported with `UnrealInsights.exe -OpenTraceFile=<utrace> -NoUI
+-AutoQuit -ExecOnAnalysisCompleteCmd="TimingInsights.ExportTimerStatistics <csv> -threads=* -sortBy=TotalInclusiveTime
+-sortOrder=Descending"`, no quotes round the csv path).
+
+| | city frame / GPU | meadow frame / GPU | memory |
+|---|---|---|---|
+| joined client, before | 16.06 / 15.12 ms | 12.55 / 11.61 ms | 12.7 GB |
+| joined client, after | 10.18 / 9.19 ms | 9.79 / 8.86 ms | 11.9 GB |
+| host playing alone, before | 17.66 ms (game thread 17.6) | 15.27 ms | 13.4 GB |
+| host playing alone, after | 10.11 ms (game thread 8.8) | 9.94 ms | 12.6 GB |
+
+- **Lumen's card refresh** (`r.LumenScene.SurfaceCache.CardCaptureRefreshFraction=0`, Config/DefaultEngine.ini): the
+  surface cache spent an eighth of its capture budget re-capturing cards it had, every frame; with ~118,000 primitive
+  groups (every instance of the city's blocks and the dressing) the captures cost 5-7 ms of GPU. `r.LumenScene.DumpStats
+  1` shows the counts; `r.LumenScene.SurfaceCache.Freeze 1` gives the most there is to win. 0.02 cost 0.5 ms more than
+  0. The "draw" (render thread) time follows the GPU: it waits on it in `EventWait/Visibility`.
+- **The city's people** (`AWRWorldNpc` BeginPlay / StepCrowdCost): the survivor's cameras, camera boom (a sweep a
+  frame) and dive component off for every NPC; every skinned piece and groom of a townsperson ticks at the body's own
+  rate (set together, so they tick in the same frames), not at all when empty or hidden; on the authority the
+  movement ticks at the actor's rate for a walker (its input comes from the actor's tick) and at 0.25 s standing.
+  Ticks a frame on the host in the city 2,219 -> 460 (skeletal meshes 775 -> 54, grooms 530, cameras 212, booms 106,
+  dives 106 -> 0).
+- **Cave meshes, one copy of each vertex** (`AWRLandCaves::FinishCube`): the rock section and the ground's lip section
+  each got the whole vertex list; split, 3.56 million fewer vertices held (0.8 GB).
+- **Checked, not changed**: a static-path proxy for the procedural meshes (ground chunks, caves): same frame time and
+  memory, GPU-bound; the people's hair simulation (`r.HairStrands.Simulation 0`): no change; hiding all the people:
+  0.4 ms. What's left on the GPU is the renderer's own (Lumen screen probes, TSR, virtual shadow maps, clouds).
+  The procedural meshes still keep their vertices on the CPU (~0.9 GB with ~0.3 GB of collision); runtime static
+  meshes would drop that but need their collision cooked another way.
+
 ## Client runs
 
 | Date | Build | Level | Run | avg ms (fps) | p95 | p99 | game | draw | GPU | hitches >50 / >100 | worst ms | GC worst ms (frames) | memory | phases avg/p99 ms | Max-iter | load |
